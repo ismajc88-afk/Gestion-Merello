@@ -1,0 +1,180 @@
+@import "tailwindcss";
+
+@theme {
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-pulse-glow: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-in-up: in-up 0.5s ease-out forwards;
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+
+    to {
+      height: 0;
+    }
+  }
+
+  @keyframes float {
+
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+
+    50% {
+      transform: translateY(-5px);
+    }
+  }
+
+  @keyframes pulse-glow {
+
+    0%,
+    100% {
+      opacity: 1;
+      filter: brightness(1);
+    }
+
+    50% {
+      opacity: .7;
+      filter: brightness(1.1);
+    }
+  }
+
+  @keyframes in-up {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+:root {
+  /* Spectre Theme - Professional High-Contrast Refinement */
+  --background: #000000;
+  /* Deep, pure black for maximum contrast */
+
+  --foreground: #f0f0f0;
+  /* Nearly white for text */
+
+  --card: #09090b;
+  /* Zinc 950 */
+  --card-foreground: #ffffff;
+
+  --popover: #09090b;
+  --popover-foreground: #ffffff;
+
+  /* Neon Gold - Adjusted for better readability against dark */
+  --primary: #f59e0b;
+  /* Amber 500 */
+  --primary-foreground: #000000;
+
+  /* Neon Crimson */
+  --secondary: #e11d48;
+  /* Rose 600 */
+  --secondary-foreground: #ffffff;
+
+  --muted: #27272a;
+  /* Zinc 800 - Lighter than bg for meaningful separation */
+  --muted-foreground: #a1a1aa;
+  /* Zinc 400 - Ensure this is legible */
+
+  --accent: #27272a;
+  /* Zinc 800 */
+  --accent-foreground: #ffffff;
+
+  --destructive: #be123c;
+  --destructive-foreground: #ffffff;
+
+  --border: #3f3f46;
+  /* Zinc 700 - Higher contrast borders */
+  --input: #27272a;
+  --ring: #f59e0b;
+
+  --radius: 1rem;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-feature-settings: "rlig" 1, "calt" 1;
+  /* Subtler gradient for better text readability */
+  background-image:
+    radial-gradient(circle at 50% 0%, #1a1a00 0%, transparent 40%),
+    radial-gradient(circle at 100% 0%, #1a0505 0%, transparent 30%);
+  background-attachment: fixed;
+}
+
+@layer utilities {
+  .glass-panel {
+    @apply bg-zinc-950/60 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/50;
+  }
+
+  .glass-card {
+    @apply bg-zinc-900/50 backdrop-blur-md border border-white/10 shadow-lg transition-all duration-300 hover:bg-zinc-800/60 hover:border-white/20 hover:shadow-primary/5 hover:-translate-y-0.5;
+  }
+
+  .text-gradient-gold {
+    @apply bg-gradient-to-r from-amber-300 via-amber-500 to-amber-300 bg-clip-text text-transparent bg-[length:200%_auto] animate-pulse-glow font-bold;
+  }
+
+  /* Utilities for ensuring text contrast */
+  .text-high-contrast {
+    @apply text-zinc-100;
+  }
+
+  .text-medium-contrast {
+    @apply text-zinc-400;
+  }
+}

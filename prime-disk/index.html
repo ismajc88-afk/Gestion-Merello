@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="MoneyMaster Pro - Plataforma Enterprise de Gestión Financiera Personal con IA, Multi-Moneda y Análisis Predictivo">
+    <meta name="keywords"
+        content="finanzas personales, gestión financiera, enterprise, multi-moneda, análisis predictivo, dashboard ejecutivo">
+    <title>MoneyMaster Pro - Financial Management Platform</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Poppins:wght@600;700;800;900&display=swap"
+        rel="stylesheet">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="theme-dark">
+
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="brand">
+                <div class="brand-icon">💎</div>
+                <div class="brand-text">
+                    <h1 class="brand-name">MoneyMaster</h1>
+                    <p class="brand-subtitle">Pro</p>
+                </div>
+            </div>
+            <button class="sidebar-toggle" id="sidebarToggle">
+                <span>☰</span>
+            </button>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a href="#dashboard" class="nav-item active" data-page="dashboard">
+                <span class="nav-icon">📊</span>
+                <span class="nav-label">Dashboard</span>
+            </a>
+            <a href="#transactions" class="nav-item" data-page="transactions">
+                <span class="nav-icon">💳</span>
+                <span class="nav-label">Transacciones</span>
+                <span class="nav-badge">12</span>
+            </a>
+            <a href="#accounts" class="nav-item" data-page="accounts">
+                <span class="nav-icon">🏦</span>
+                <span class="nav-label">Cuentas</span>
+            </a>
+            <a href="#budgets" class="nav-item" data-page="budgets">
+                <span class="nav-icon">📈</span>
+                <span class="nav-label">Presupuestos</span>
+            </a>
+            <a href="#goals" class="nav-item" data-page="goals">
+                <span class="nav-icon">🎯</span>
+                <span class="nav-label">Metas</span>
+            </a>
+            <a href="#reports" class="nav-item" data-page="reports">
+                <span class="nav-icon">📑</span>
+                <span class="nav-label">Reportes</span>
+            </a>
+            <a href="#analytics" class="nav-item" data-page="analytics">
+                <span class="nav-icon">📉</span>
+                <span class="nav-label">Análisis</span>
+            </a>
+
+            <div class="nav-divider"></div>
+
+            <a href="#settings" class="nav-item" data-page="settings">
+                <span class="nav-icon">⚙️</span>
+                <span class="nav-label">Configuración</span>
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="user-profile">
+                <div class="user-avatar">👤</div>
+                <div class="user-info">
+                    <p class="user-name">Usuario Pro</p>
+                    <p class="user-role">Premium Account</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main App Container -->
+    <div class="app-container">
+
+        <!-- Top Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <button class="mobile-menu-btn" id="mobileMenuBtn">☰</button>
+                <div class="header-title">
+                    <h2 id="pageTitle">Dashboard Ejecutivo</h2>
+                    <p class="header-subtitle">Resumen financiero en tiempo real</p>
+                </div>
+            </div>
+
+            <div class="header-right">
+                <!-- Quick Stats -->
+                <div class="quick-stats">
+                    <div class="quick-stat">
+                        <span class="quick-stat-label">Balance</span>
+                        <span class="quick-stat-value positive" id="headerBalance">€0</span>
+                    </div>
+                    <div class="quick-stat">
+                        <span class="quick-stat-label">Este Mes</span>
+                        <span class="quick-stat-value" id="headerMonthly">€0</span>
+                    </div>
+                </div>
+
+                <!-- Header Actions -->
+                <div class="header-actions">
+                    <button class="header-btn" id="notificationsBtn" title="Notificaciones">
+                        <span>🔔</span>
+                        <span class="notification-badge">3</span>
+                    </button>
+                    <button class="header-btn" id="currencyBtn" title="Moneda">
+                        <span>💱</span>
+                    </button>
+                    <button class="header-btn" id="themeBtn" title="Cambiar tema">
+                        <span>🌓</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="app-main">
+
+            <!-- DASHBOARD PAGE -->
+            <div class="page active" id="page-dashboard">
+
+                <!-- KPI Cards Row -->
+                <section class="kpi-grid">
+                    <div class="kpi-card primary">
+                        <div class="kpi-header">
+                            <span class="kpi-icon">💰</span>
+                            <span class="kpi-trend positive">↑ 12.5%</span>
+                        </div>
+                        <div class="kpi-body">
+                            <p class="kpi-label">Balance Total</p>
+                            <h3 class="kpi-value" id="kpiBalance">€12,450.00</h3>
+                            <p class="kpi-subtitle">+€1,250 este mes</p>
+                        </div>
+                    </div>
+
+                    <div class="kpi-card success">
+                        <div class="kpi-header">
+                            <span class="kpi-icon">📥</span>
+                            <span class="kpi-trend positive">↑ 8.2%</span>
+                        </div>
+                        <div class="kpi-body">
+                            <p class="kpi-label">Ingresos Mensuales</p>
+                            <h3 class="kpi-value" id="kpiIncome">€5,200.00</h3>
+                            <p class="kpi-subtitle">vs €4,800 anterior</p>
+                        </div>
+                    </div>
+
+                    <div class="kpi-card danger">
+                        <div class="kpi-header">
+                            <span class="kpi-icon">📤</span>
+                            <span class="kpi-trend negative">↓ 3.1%</span>
+                        </div>
+                        <div class="kpi-body">
+                            <p class="kpi-label">Gastos Mensuales</p>
+                            <h3 class="kpi-value" id="kpiExpenses">€3,150.00</h3>
+                            <p class="kpi-subtitle">vs €3,250 anterior</p>
+                        </div>
+                    </div>
+
+                    <div class="kpi-card info">
+                        <div class="kpi-header">
+                            <span class="kpi-icon">💎</span>
+                            <span class="kpi-score">Excelente</span>
+                        </div>
+                        <div class="kpi-body">
+                            <p class="kpi-label">Salud Financiera</p>
+                            <h3 class="kpi-value" id="kpiHealth">85/100</h3>
+                            <div class="mini-progress">
+                                <div class="mini-progress-bar" style="width: 85%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Main Dashboard Grid -->
+                <div class="dashboard-grid">
+
+                    <!-- Cash Flow Chart -->
+                    <div class="widget widget-large">
+                        <div class="widget-header">
+                            <div class="widget-title">
+                                <h3>Flujo de Caja</h3>
+                                <p>Ingresos vs Gastos</p>
+                            </div>
+                            <div class="widget-controls">
+                                <select class="widget-select" id="cashflowPeriod">
+                                    <option value="7">Últimos 7 días</option>
+                                    <option value="30" selected>Últimos 30 días</option>
+                                    <option value="90">Últimos 90 días</option>
+                                    <option value="365">Último año</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="widget-body">
+                            <canvas id="cashFlowChart" height="300"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Category Distribution -->
+                    <div class="widget widget-medium">
+                        <div class="widget-header">
+                            <div class="widget-title">
+                                <h3>Distribución por Categorías</h3>
+                                <p>Gastos del mes</p>
+                            </div>
+                        </div>
+                        <div class="widget-body">
+                            <canvas id="categoryChart" height="300"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Recent Transactions -->
+                    <div class="widget widget-medium">
+                        <div class="widget-header">
+                            <div class="widget-title">
+                                <h3>Transacciones Recientes</h3>
+                                <p>Últimas operaciones</p>
+                            </div>
+                            <a href="#transactions" class="widget-link">Ver todas →</a>
+                        </div>
+                        <div class="widget-body">
+                            <div class="recent-transactions" id="recentTransactions">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Goals Progress -->
+                    <div class="widget widget-small">
+                        <div class="widget-header">
+                            <div class="widget-title">
+                                <h3>Metas Activas</h3>
+                            </div>
+                        </div>
+                        <div class="widget-body">
+                            <div class="goals-list" id="goalsList">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Monthly Comparison -->
+                    <div class="widget widget-small">
+                        <div class="widget-header">
+                            <div class="widget-title">
+                                <h3>Comparativa Mensual</h3>
+                            </div>
+                        </div>
+                        <div class="widget-body">
+                            <canvas id="comparisonChart" height="200"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Top Categories -->
+                    <div class="widget widget-small">
+                        <div class="widget-header">
+                            <div class="widget-title">
+                                <h3>Top Categorías</h3>
+                                <p>Mayores gastos</p>
+                            </div>
+                        </div>
+                        <div class="widget-body">
+                            <div class="top-categories" id="topCategories">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Savings Rate -->
+                    <div class="widget widget-small">
+                        <div class="widget-header">
+                            <div class="widget-title">
+                                <h3>Tasa de Ahorro</h3>
+                            </div>
+                        </div>
+                        <div class="widget-body centered">
+                            <div class="circular-progress" id="savingsProgress">
+                                <svg viewBox="0 0 100 100">
+                                    <circle class="progress-bg" cx="50" cy="50" r="40"></circle>
+                                    <circle class="progress-bar" cx="50" cy="50" r="40"></circle>
+                                </svg>
+                                <div class="progress-value">
+                                    <span class="progress-number">39.4</span>
+                                    <span class="progress-unit">%</span>
+                                </div>
+                            </div>
+                            <p class="widget-subtitle">€2,050 ahorrados</p>
+                        </div>
+                    </div>
+
+                    <!-- Alerts & Insights -->
+                    <div class="widget widget-full">
+                        <div class="widget-header">
+                            <div class="widget-title">
+                                <h3>🤖 Insights Inteligentes</h3>
+                                <p>Análisis automático de tus finanzas</p>
+                            </div>
+                        </div>
+                        <div class="widget-body">
+                            <div class="insights-grid" id="insightsGrid">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- TRANSACTIONS PAGE -->
+            <div class="page" id="page-transactions">
+                <div class="page-header">
+                    <div>
+                        <h2>Gestión de Transacciones</h2>
+                        <p>Administra todos tus ingresos y gastos</p>
+                    </div>
+                    <button class="btn-primary btn-large" id="addTransactionBtn">
+                        <span>➕</span>
+                        <span>Nueva Transacción</span>
+                    </button>
+                </div>
+
+                <!-- Transaction Filters -->
+                <div class="filters-bar">
+                    <input type="text" class="filter-input" id="searchTransactions"
+                        placeholder="🔍 Buscar transacciones...">
+                    <select class="filter-select" id="filterType">
+                        <option value="all">Todos los tipos</option>
+                        <option value="income">Ingresos</option>
+                        <option value="expense">Gastos</option>
+                    </select>
+                    <select class="filter-select" id="filterCategory">
+                        <option value="all">Todas las categorías</option>
+                    </select>
+                    <select class="filter-select" id="filterAccount">
+                        <option value="all">Todas las cuentas</option>
+                    </select>
+                    <input type="date" class="filter-input" id="filterDateFrom" placeholder="Desde">
+                    <input type="date" class="filter-input" id="filterDateTo" placeholder="Hasta">
+                </div>
+
+                <!-- Transactions Table -->
+                <div class="data-table">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Descripción</th>
+                                <th>Categoría</th>
+                                <th>Cuenta</th>
+                                <th>Tipo</th>
+                                <th class="text-right">Monto</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactionsTableBody">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ACCOUNTS PAGE -->
+            <div class="page" id="page-accounts">
+                <div class="page-header">
+                    <div>
+                        <h2>Mis Cuentas</h2>
+                        <p>Gestiona tus cuentas bancarias e inversiones</p>
+                    </div>
+                    <button class="btn-primary btn-large" id="addAccountBtn">
+                        <span>➕</span>
+                        <span>Nueva Cuenta</span>
+                    </button>
+                </div>
+
+                <div class="accounts-grid" id="accountsGrid">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- BUDGETS PAGE -->
+            <div class="page" id="page-budgets">
+                <div class="page-header">
+                    <div>
+                        <h2>Presupuestos</h2>
+                        <p>Control y planificación de gastos por categoría</p>
+                    </div>
+                    <button class="btn-primary btn-large" id="editBudgetsBtn">
+                        <span>⚙️</span>
+                        <span>Configurar Presupuestos</span>
+                    </button>
+                </div>
+
+                <div class="budgets-grid" id="budgetsGrid">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- GOALS PAGE -->
+            <div class="page" id="page-goals">
+                <div class="page-header">
+                    <div>
+                        <h2>Metas Financieras</h2>
+                        <p>Define y alcanza tus objetivos de ahorro</p>
+                    </div>
+                    <button class="btn-primary btn-large" id="addGoalBtn">
+                        <span>🎯</span>
+                        <span>Nueva Meta</span>
+                    </button>
+                </div>
+
+                <div class="goals-grid" id="goalsGrid">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- REPORTS PAGE -->
+            <div class="page" id="page-reports">
+                <div class="page-header">
+                    <div>
+                        <h2>Reportes Profesionales</h2>
+                        <p>Genera reportes detallados de tus finanzas</p>
+                    </div>
+                </div>
+
+                <div class="reports-grid">
+                    <div class="report-card">
+                        <div class="report-icon">📊</div>
+                        <h3>Estado de Resultados</h3>
+                        <p>Reporte completo de ingresos y gastos</p>
+                        <button class="btn-secondary">Generar PDF</button>
+                    </div>
+                    <div class="report-card">
+                        <div class="report-icon">💰</div>
+                        <h3>Balance General</h3>
+                        <p>Activos, pasivos y patrimonio neto</p>
+                        <button class="btn-secondary">Generar PDF</button>
+                    </div>
+                    <div class="report-card">
+                        <div class="report-icon">📈</div>
+                        <h3>Flujo de Caja</h3>
+                        <p>Análisis detallado de movimientos</p>
+                        <button class="btn-secondary">Generar PDF</button>
+                    </div>
+                    <div class="report-card">
+                        <div class="report-icon">🎯</div>
+                        <h3>Progreso de Metas</h3>
+                        <p>Seguimiento de objetivos financieros</p>
+                        <button class="btn-secondary">Generar PDF</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ANALYTICS PAGE -->
+            <div class="page" id="page-analytics">
+                <div class="page-header">
+                    <div>
+                        <h2>Análisis Avanzado</h2>
+                        <p>Visualizaciones y métricas profundas</p>
+                    </div>
+                </div>
+
+                <div class="analytics-grid">
+                    <div class="widget widget-large">
+                        <div class="widget-header">
+                            <h3>Tendencia Histórica</h3>
+                        </div>
+                        <div class="widget-body">
+                            <canvas id="trendChart" height="300"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="widget widget-medium">
+                        <div class="widget-header">
+                            <h3>Heatmap de Gastos</h3>
+                        </div>
+                        <div class="widget-body">
+                            <div id="heatmapChart"></div>
+                        </div>
+                    </div>
+
+                    <div class="widget widget-medium">
+                        <div class="widget-header">
+                            <h3>Proyección 12 Meses</h3>
+                        </div>
+                        <div class="widget-body">
+                            <canvas id="projectionChart" height="300"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SETTINGS PAGE -->
+            <div class="page" id="page-settings">
+                <div class="page-header">
+                    <div>
+                        <h2>Configuración</h2>
+                        <p>Personaliza tu experiencia</p>
+                    </div>
+                </div>
+
+                <div class="settings-grid">
+                    <div class="settings-section">
+                        <h3>🎨 Apariencia</h3>
+                        <div class="setting-item">
+                            <div>
+                                <p class="setting-label">Tema</p>
+                                <p class="setting-hint">Elige entre claro u oscuro</p>
+                            </div>
+                            <select id="themeSelect">
+                                <option value="dark">Oscuro</option>
+                                <option value="light">Claro</option>
+                                <option value="auto">Automático</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3>💱 Moneda</h3>
+                        <div class="setting-item">
+                            <div>
+                                <p class="setting-label">Moneda Principal</p>
+                                <p class="setting-hint">Moneda por defecto</p>
+                            </div>
+                            <select id="currencySelect">
+                                <option value="EUR">EUR - Euro</option>
+                                <option value="USD">USD - Dólar</option>
+                                <option value="GBP">GBP - Libra</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3>📊 Datos</h3>
+                        <div class="setting-item">
+                            <button class="btn-secondary">Exportar Datos (JSON)</button>
+                            <button class="btn-secondary">Exportar Datos (CSV)</button>
+                            <button class="btn-danger">Borrar Todos los Datos</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Transaction Modal -->
+    <div class="modal" id="transactionModal">
+        <div class="modal-overlay" id="transactionModalOverlay"></div>
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h3 id="transactionModalTitle">Nueva Transacción</h3>
+                <button class="modal-close" id="closeTransactionModal">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="transactionForm">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Tipo *</label>
+                            <select id="transactionType" required>
+                                <option value="expense">Gasto</option>
+                                <option value="income">Ingreso</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Cantidad *</label>
+                            <input type="number" id="transactionAmount" step="0.01" min="0" placeholder="0.00" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Categoría *</label>
+                            <select id="transactionCategory" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Cuenta *</label>
+                            <select id="transactionAccount" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Fecha *</label>
+                            <input type="date" id="transactionDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Moneda</label>
+                            <select id="transactionCurrency">
+                                <option value="EUR">EUR</option>
+                                <option value="USD">USD</option>
+                                <option value="GBP">GBP</option>
+                            </select>
+                        </div>
+                        <div class="form-group full-width">
+                            <label>Descripción *</label>
+                            <input type="text" id="transactionDescription" placeholder="Ej: Compra en supermercado"
+                                required>
+                        </div>
+                        <div class="form-group full-width">
+                            <label>Notas</label>
+                            <textarea id="transactionNotes" rows="3"
+                                placeholder="Notas adicionales (opcional)"></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="cancelTransaction">Cancelar</button>
+                <button class="btn-primary" id="saveTransaction">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Center -->
+    <div class="notification-center" id="notificationCenter">
+        <div class="notification-header">
+            <h3>Notificaciones</h3>
+            <button class="notification-close">✕</button>
+        </div>
+        <div class="notification-list">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="metrics.js"></script>
+    <script src="charts.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
