@@ -1,0 +1,13 @@
+
+{
+  "rewrites": [
+    {
+      "source": "/(OneSignalSDK.sw.js|sw.js)",
+      "destination": "/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

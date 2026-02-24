@@ -1,0 +1,11 @@
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# Regla esencial para SPAs (React Router, etc.)
+# Redirige todo a index.html para que el routing funcione al recargar
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
