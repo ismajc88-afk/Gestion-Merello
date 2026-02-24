@@ -1,0 +1,15 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/finance-pro/layout,_N_T_/finance-pro/page,_N_T_/finance-pro"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/finance-pro/__PAGE__",
+    "/finance-pro",
+    "/_index",
+    "/_head"
+  ]
+}

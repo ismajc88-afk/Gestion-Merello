@@ -1,0 +1,21 @@
+{
+  "/_global-error/page": "/_global-error",
+  "/_not-found/page": "/_not-found",
+  "/administration/page": "/administration",
+  "/documents/page": "/documents",
+  "/entertainment/page": "/entertainment",
+  "/events/page": "/events",
+  "/expenses/page": "/expenses",
+  "/favicon.ico/route": "/favicon.ico",
+  "/finance-pro/page": "/finance-pro",
+  "/incidents/page": "/incidents",
+  "/income/page": "/income",
+  "/inventory/page": "/inventory",
+  "/logistics/page": "/logistics",
+  "/lottery/page": "/lottery",
+  "/members/page": "/members",
+  "/page": "/",
+  "/reports/page": "/reports",
+  "/social/page": "/social",
+  "/sponsors/page": "/sponsors"
+}

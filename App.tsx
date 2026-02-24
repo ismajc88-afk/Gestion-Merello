@@ -273,7 +273,7 @@ const App: React.FC = () => {
                 onExit={() => setUserRole(null)}
                 totalSessionRevenue={data.barSessions?.find(s => !s.isClosed)?.revenue || 0}
                 ticketCounts={getActiveSessionCounts()}
-                onCreateIncident={(t, p, sId, q, term) => { updateData({ incidents: [...data.incidents, { id: Date.now().toString(), title: t, priority: p, status: 'OPEN', timestamp: new Date().toISOString(), stockItemId: sId, quantity: q, terminal: term }] }); if (p === 'URGENT') sendPushAlert(`🚨 ALERTA CAJA`, t); }}
+                onCreateIncident={(t, p, sId, q, term) => { updateData({ incidents: [...data.incidents, { id: Date.now().toString(), title: t, priority: p, status: 'OPEN', timestamp: new Date().toISOString(), stockItemId: sId, quantity: q, terminal: term }] }); sendPushAlert(p === 'URGENT' ? `🚨 ALERTA CAJA` : `🛠️ REPOSICIÓN CAJA`, t); }}
                 onResolveIncident={(id) => updateData({ incidents: data.incidents.map(i => i.id === id ? { ...i, status: 'RESOLVED' } : i) })}
                 onUpdateStock={(id, q) => updateData({ stock: data.stock.map(i => i.id === id ? { ...i, quantity: q } : i) })}
                 onUpdateWorkload={handleKioskWorkloadUpdate}
@@ -336,12 +336,16 @@ const App: React.FC = () => {
                             requestedBy: userRole
                         }]
                     });
-                    if (p === 'URGENT') sendPushAlert(`🚨 ALERTA BARRA`, t);
+                    sendPushAlert(p === 'URGENT' ? `🚨 ALERTA BARRA` : `🛠️ REPOSICIÓN BARRA`, t);
                 }}
                 onResolveIncident={(id, status) => updateData({ incidents: data.incidents.map(i => i.id === id ? { ...i, status: (status as Incident['status']) || 'RESOLVED' } : i) })}
                 onUpdateStock={(id, q) => updateData({ stock: data.stock.map(i => i.id === id ? { ...i, quantity: q } : i) })}
                 onUpdateWorkload={handleKioskWorkloadUpdate}
-                onMarkAsDelivered={(id) => updateData({ incidents: data.incidents.map(i => i.id === id ? { ...i, status: 'DELIVERED', deliveredAt: new Date().toISOString(), deliveredBy: userRole } : i) })}
+                onMarkAsDelivered={(id) => {
+                    updateData({ incidents: data.incidents.map(i => i.id === id ? { ...i, status: 'DELIVERED', deliveredAt: new Date().toISOString(), deliveredBy: userRole } : i) });
+                    const incident = data.incidents.find(i => i.id === id);
+                    if (incident) sendPushAlert('🚚 PEDIDO EN CAMINO', `Logística ha enviado tu petición de ${incident.title.replace('🔓 APROBACIÓN REQUERIDA: ', '')} al ${incident.terminal || 'Barra'}`);
+                }}
                 onConfirmReceipt={(id) => {
                     const incident = data.incidents.find(i => i.id === id);
                     if (incident && incident.stockItemId && incident.quantity) {
@@ -358,6 +362,7 @@ const App: React.FC = () => {
                                 } : i)
                             });
                             toast.success(`Stock actualizado: ${currentStock.quantity} → ${newQty}`);
+                            sendPushAlert('✅ PEDIDO RECIBIDO', `La barra ${incident.terminal || ''} ha confirmado la recepción de ${incident.title.replace('🔓 APROBACIÓN REQUERIDA: ', '')}`);
                         }
                     }
                 }}
@@ -396,12 +401,16 @@ const App: React.FC = () => {
                             requestedBy: userRole
                         }]
                     });
-                    if (p === 'URGENT') sendPushAlert(`🚨 ALERTA CASAL`, t);
+                    sendPushAlert(p === 'URGENT' ? `🚨 ALERTA CASAL` : `🛠️ REPOSICIÓN CASAL`, t);
                 }}
                 onResolveIncident={(id, status) => updateData({ incidents: data.incidents.map(i => i.id === id ? { ...i, status: (status as Incident['status']) || 'RESOLVED' } : i) })}
                 onUpdateStock={(id, q) => updateData({ stock: data.stock.map(i => i.id === id ? { ...i, quantity: q } : i) })}
                 onUpdateWorkload={handleKioskWorkloadUpdate}
-                onMarkAsDelivered={(id) => updateData({ incidents: data.incidents.map(i => i.id === id ? { ...i, status: 'DELIVERED', deliveredAt: new Date().toISOString(), deliveredBy: userRole } : i) })}
+                onMarkAsDelivered={(id) => {
+                    updateData({ incidents: data.incidents.map(i => i.id === id ? { ...i, status: 'DELIVERED', deliveredAt: new Date().toISOString(), deliveredBy: userRole } : i) });
+                    const incident = data.incidents.find(i => i.id === id);
+                    if (incident) sendPushAlert('🚚 PEDIDO EN CAMINO', `Logística ha enviado tu petición de ${incident.title.replace('🔓 APROBACIÓN REQUERIDA: ', '')} al ${incident.terminal || 'Barra'}`);
+                }}
                 onConfirmReceipt={(id) => {
                     const incident = data.incidents.find(i => i.id === id);
                     if (incident && incident.stockItemId && incident.quantity) {
@@ -418,6 +427,7 @@ const App: React.FC = () => {
                                 } : i)
                             });
                             toast.success(`Stock actualizado: ${currentStock.quantity} → ${newQty}`);
+                            sendPushAlert('✅ PEDIDO RECIBIDO', `La barra ${incident.terminal || ''} ha confirmado la recepción de ${incident.title.replace('🔓 APROBACIÓN REQUERIDA: ', '')}`);
                         }
                     }
                 }}
@@ -507,7 +517,11 @@ const App: React.FC = () => {
                 onResolveIncident={(id, status) => updateData({ incidents: data.incidents.map(i => i.id === id ? { ...i, status: (status as Incident['status']) || 'RESOLVED' } : i) })}
                 onUpdateStock={(id, q) => updateData({ stock: data.stock.map(i => i.id === id ? { ...i, quantity: q } : i) })}
                 onUpdateWorkload={handleKioskWorkloadUpdate}
-                onMarkAsDelivered={(id) => updateData({ incidents: data.incidents.map(i => i.id === id ? { ...i, status: 'DELIVERED', deliveredAt: new Date().toISOString(), deliveredBy: userRole } : i) })}
+                onMarkAsDelivered={(id) => {
+                    updateData({ incidents: data.incidents.map(i => i.id === id ? { ...i, status: 'DELIVERED', deliveredAt: new Date().toISOString(), deliveredBy: userRole } : i) });
+                    const incident = data.incidents.find(i => i.id === id);
+                    if (incident) sendPushAlert('🚚 PEDIDO EN CAMINO', `Logística ha enviado tu petición de ${incident.title.replace('🔓 APROBACIÓN REQUERIDA: ', '')} al ${incident.terminal || 'Barra'}`);
+                }}
                 onConfirmReceipt={(id) => {
                     const incident = data.incidents.find(i => i.id === id);
                     if (incident && incident.stockItemId && incident.quantity) {
