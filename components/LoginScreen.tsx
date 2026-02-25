@@ -212,28 +212,46 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         {config.eventName.split(' ')[0]}<br /><span className="text-blue-600">PLANNER {config.year}</span>
       </h1>
 
-      {hasPushSupport && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onToggleNotifications?.(); }}
-          disabled={isSubscribed}
-          className={`w-full max-w-sm mb-8 px-6 py-4 rounded-3xl flex items-center gap-4 transition-all border-2 shadow-xl group relative overflow-hidden ${isSubscribed
-            ? 'bg-emerald-950/60 border-emerald-500/30 text-emerald-400 cursor-default'
-            : 'bg-blue-600 border-blue-400 text-white hover:bg-blue-500 active:scale-95 animate-pulse'
-            }`}
+      {/* BOTÓN SUSCRIPCIÓN NTFY Y ALERTAS NATIVAS */}
+      <div className="w-full max-w-sm mb-8 flex flex-col items-center gap-3">
+        {hasPushSupport && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleNotifications?.(); }}
+            disabled={isSubscribed}
+            className={`w-full px-6 py-4 rounded-3xl flex items-center gap-4 transition-all border-2 shadow-xl group relative overflow-hidden ${isSubscribed
+              ? 'bg-emerald-950/60 border-emerald-500/30 text-emerald-400 cursor-default'
+              : 'bg-blue-600 border-blue-400 text-white hover:bg-blue-500 active:scale-95 animate-pulse'
+              }`}
+          >
+            <div className={`p-2 rounded-xl shrink-0 transition-colors ${isSubscribed ? 'bg-emerald-500 text-slate-950' : 'bg-white text-blue-600'}`}>
+              {isSubscribed ? <CheckCircle2 size={20} /> : <BellRing size={20} className="animate-wiggle" />}
+            </div>
+            <div className="text-left flex-1 relative z-10">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-0.5">
+                {isSubscribed ? 'NAVEGADOR CONECTADO' : 'ACTIVAR ALERTAS WEB'}
+              </p>
+              <p className="text-[9px] font-medium opacity-80 leading-tight">
+                {isSubscribed ? 'Recibirás avisos en este dispositivo.' : 'Toca para permitir notificaciones.'}
+              </p>
+            </div>
+          </button>
+        )}
+
+        {/* APP NTFY - ALTERNATIVA MOVILES */}
+        <a
+          href={`ntfy://${config.ntfyTopic || 'merello-planner-2026-global-alerts'}?display=Merello+Planner`}
+          className="bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 text-emerald-400 py-3 px-6 rounded-3xl flex items-center justify-center gap-3 transition-colors shadow-lg active:scale-95 w-full group"
         >
-          <div className={`p-2 rounded-xl shrink-0 transition-colors ${isSubscribed ? 'bg-emerald-500 text-slate-950' : 'bg-white text-blue-600'}`}>
-            {isSubscribed ? <CheckCircle2 size={20} /> : <BellRing size={20} className="animate-wiggle" />}
+          <BellRing size={20} className="group-hover:animate-wiggle" />
+          <div className="text-left leading-tight">
+            <span className="block text-xs font-black uppercase tracking-widest text-zinc-100">Suscribirse en App Ntfy</span>
+            <span className="block text-[9px] font-bold text-emerald-500/80">Recomendado para Móviles (Android/iOS)</span>
           </div>
-          <div className="text-left flex-1 relative z-10">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-0.5">
-              {isSubscribed ? 'DISPOSITIVO CONECTADO' : 'ACTIVAR ALERTAS'}
-            </p>
-            <p className="text-[9px] font-medium opacity-80 leading-tight">
-              {isSubscribed ? 'Recibirás avisos de la falla.' : 'Toca aquí para permitir avisos.'}
-            </p>
-          </div>
-        </button>
-      )}
+        </a>
+        <p className="text-[9px] text-zinc-500 text-center px-2 font-bold leading-tight">
+          iOS: Abre <span className="text-emerald-400 font-mono tracking-wider break-all">{config.ntfyTopic || 'merello-planner-2026-global-alerts'}</span> en la app.
+        </p>
+      </div>
 
       <div className="flex-1 w-full max-w-5xl overflow-y-auto custom-scrollbar pb-4 px-2">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 relative z-10 mb-8">
@@ -269,23 +287,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           ))}
         </div>
 
-        {/* BOTÓN SUSCRIPCIÓN NTFY */}
-        <div className="w-full max-w-sm mx-auto flex flex-col items-center">
-          <a
-            href={`ntfy://${config.ntfyTopic || 'merello-planner-2026-global-alerts'}?display=Merello+Planner`}
-            className="bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 text-emerald-400 py-3 px-6 rounded-2xl flex items-center justify-center gap-3 transition-colors shadow-lg active:scale-95 w-full group"
-          >
-            <BellRing size={20} className="group-hover:animate-wiggle" />
-            <div className="text-left leading-tight">
-              <span className="block text-xs font-black uppercase tracking-widest text-zinc-100">Suscribirse a Alertas</span>
-              <span className="block text-[9px] font-bold text-emerald-500/80">Requiere tener instalada la APP de Ntfy</span>
-            </div>
-          </a>
-
-          <p className="text-[10px] text-zinc-500 mt-2 text-center px-4 max-w-xs leading-relaxed font-bold">
-            Si usas iOS, abre Ntfy y suscríbete manualmente al canal: <span className="text-emerald-400 font-mono tracking-wider break-all">{config.ntfyTopic || 'merello-planner-2026-global-alerts'}</span>
-          </p>
-        </div>
 
       </div>
 
