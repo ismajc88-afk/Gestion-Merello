@@ -85,7 +85,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, ModulePer
   ADMIN: generatePermsMap(ALL_IDS),
   PRESIDENTE: generatePermsMap(ALL_IDS.filter(id => id !== 'kiosk')),
   TESORERIA: generatePermsMap(['dashboard', 'help', 'inventory', 'cash', 'reports', 'bar-profit']),
-  LOGISTICA: generatePermsMap(['dashboard', 'help', 'stock', 'purchase', 'shopping', 'suppliers', 'logistics', 'work-groups']),
+  LOGISTICA: generatePermsMap(['dashboard', 'help', 'stock', 'purchase', 'shopping', 'suppliers', 'logistics', 'work-groups', 'kiosk']),
   BARRA: generatePermsMap(['dashboard', 'help', 'bar', 'stock', 'bar-profit', 'logistics']),
   CAMARERO: generatePermsMap(['kiosk']),
   CAJERO: generatePermsMap(['kiosk']),
@@ -183,7 +183,8 @@ export type AuditActionType =
   | 'PRESUPUESTO_MODIFICADO'
   | 'SUBPARTIDA_CREADA' | 'SUBPARTIDA_ELIMINADA'
   | 'STOCK_ACTUALIZADO'
-  | 'CONFIG_CAMBIADA';
+  | 'CONFIG_CAMBIADA'
+  | 'LOGÍSTICA_ENVÍO' | 'LOGÍSTICA_ENTREGA';
 
 export interface AuditLogEntry {
   id: string;

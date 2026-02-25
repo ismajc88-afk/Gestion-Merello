@@ -89,7 +89,7 @@ export const Layout: React.FC<LayoutProps> = ({
 
          { id: 'tools', type: 'header', label: 'Utilidades' },
          { id: 'tools', label: 'Calculadoras', icon: Calculator },
-         { id: 'kiosk', label: 'Modo Kiosko', icon: Monitor },
+         { id: 'kiosk', label: userRole === 'LOGISTICA' ? 'Panel Entregas Kanban' : 'Modo Kiosko', icon: Monitor },
          { id: 'settings-master', label: 'Ajustes', icon: Settings },
       ];
 

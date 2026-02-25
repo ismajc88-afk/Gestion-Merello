@@ -409,7 +409,10 @@ const App: React.FC = () => {
                 onMarkAsDelivered={(id) => {
                     updateData({ incidents: data.incidents.map(i => i.id === id ? { ...i, status: 'DELIVERED', deliveredAt: new Date().toISOString(), deliveredBy: userRole } : i) });
                     const incident = data.incidents.find(i => i.id === id);
-                    if (incident) sendPushAlert('🚚 PEDIDO EN CAMINO', `Logística ha enviado tu petición de ${incident.title.replace('🔓 APROBACIÓN REQUERIDA: ', '')} al ${incident.terminal || 'Barra'}`);
+                    if (incident) {
+                        sendPushAlert('🚚 PEDIDO EN CAMINO', `Logística ha enviado tu petición de ${incident.title.replace('🔓 APROBACIÓN REQUERIDA: ', '')} al ${incident.terminal || 'Barra'}`);
+                        addAuditLog('LOGÍSTICA_ENVÍO', 'logistics', `Pedido ${incident.title.replace('🔓 APROBACIÓN REQUERIDA: ', '')} en camino hacia ${incident.terminal || 'Barra'}`);
+                    }
                 }}
                 onConfirmReceipt={(id) => {
                     const incident = data.incidents.find(i => i.id === id);
@@ -428,6 +431,7 @@ const App: React.FC = () => {
                             });
                             toast.success(`Stock actualizado: ${currentStock.quantity} → ${newQty}`);
                             sendPushAlert('✅ PEDIDO RECIBIDO', `La barra ${incident.terminal || ''} ha confirmado la recepción de ${incident.title.replace('🔓 APROBACIÓN REQUERIDA: ', '')}`);
+                            addAuditLog('LOGÍSTICA_ENTREGA', 'logistics', `La barra ${incident.terminal || ''} ha recibido y confirmado ${incident.title.replace('🔓 APROBACIÓN REQUERIDA: ', '')}`);
                         }
                     }
                 }}
@@ -520,7 +524,10 @@ const App: React.FC = () => {
                 onMarkAsDelivered={(id) => {
                     updateData({ incidents: data.incidents.map(i => i.id === id ? { ...i, status: 'DELIVERED', deliveredAt: new Date().toISOString(), deliveredBy: userRole } : i) });
                     const incident = data.incidents.find(i => i.id === id);
-                    if (incident) sendPushAlert('🚚 PEDIDO EN CAMINO', `Logística ha enviado tu petición de ${incident.title.replace('🔓 APROBACIÓN REQUERIDA: ', '')} al ${incident.terminal || 'Barra'}`);
+                    if (incident) {
+                        sendPushAlert('🚚 PEDIDO EN CAMINO', `Logística ha enviado tu petición de ${incident.title.replace('🔓 APROBACIÓN REQUERIDA: ', '')} al ${incident.terminal || 'Barra'}`);
+                        addAuditLog('LOGÍSTICA_ENVÍO', 'logistics', `Pedido ${incident.title.replace('🔓 APROBACIÓN REQUERIDA: ', '')} en camino hacia ${incident.terminal || 'Barra'}`);
+                    }
                 }}
                 onConfirmReceipt={(id) => {
                     const incident = data.incidents.find(i => i.id === id);

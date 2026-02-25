@@ -236,7 +236,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       )}
 
       <div className="flex-1 w-full max-w-5xl overflow-y-auto custom-scrollbar pb-4 px-2">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 relative z-10">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 relative z-10 mb-8">
           {profiles.map((profile) => (
             <button
               key={profile.id}
@@ -268,10 +268,29 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             </button>
           ))}
         </div>
+
+        {/* BOTÓN SUSCRIPCIÓN NTFY */}
+        <div className="w-full max-w-sm mx-auto flex flex-col items-center">
+          <a
+            href={`ntfy://${config.ntfyTopic || 'merello-planner-2026-global-alerts'}?display=Merello+Planner`}
+            className="bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 text-emerald-400 py-3 px-6 rounded-2xl flex items-center justify-center gap-3 transition-colors shadow-lg active:scale-95 w-full group"
+          >
+            <BellRing size={20} className="group-hover:animate-wiggle" />
+            <div className="text-left leading-tight">
+              <span className="block text-xs font-black uppercase tracking-widest text-zinc-100">Suscribirse a Alertas</span>
+              <span className="block text-[9px] font-bold text-emerald-500/80">Requiere tener instalada la APP de Ntfy</span>
+            </div>
+          </a>
+
+          <p className="text-[10px] text-zinc-500 mt-2 text-center px-4 max-w-xs leading-relaxed font-bold">
+            Si usas iOS, abre Ntfy y suscríbete manualmente al canal: <span className="text-emerald-400 font-mono tracking-wider break-all">{config.ntfyTopic || 'merello-planner-2026-global-alerts'}</span>
+          </p>
+        </div>
+
       </div>
 
       {/* VERSION INDICATOR */}
-      <div className="mt-4 text-[9px] font-mono text-slate-600 uppercase tracking-widest opacity-50">
+      <div className="mt-4 text-[9px] font-mono text-slate-600 uppercase tracking-widest opacity-50 shrink-0">
         v3.0.1 (STOCK ONLY FIX)
       </div>
 
