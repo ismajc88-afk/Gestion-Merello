@@ -239,7 +239,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
         {/* APP NTFY - ALTERNATIVA MOVILES */}
         <a
-          href={`ntfy://${config.ntfyTopic || 'merello-planner-2026-global-alerts'}?display=Merello+Planner`}
+          href={`ntfy://ntfy.sh/${config.ntfyTopic || 'merello-planner-2026-global-alerts'}?display=Merello+Planner`}
           className="bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 text-emerald-400 py-3 px-6 rounded-3xl flex items-center justify-center gap-3 transition-colors shadow-lg active:scale-95 w-full group"
         >
           <BellRing size={20} className="group-hover:animate-wiggle" />
