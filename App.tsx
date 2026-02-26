@@ -139,7 +139,7 @@ const App: React.FC = () => {
         if (now - lastPollTimeRef.current > 2000) {
             lastPollTimeRef.current = now;
             try {
-                const response = await fetch(`https://ntfy.sh/${topic}/json?since=all&limit=5`, { cache: 'no-store', method: 'GET' });
+                const response = await fetch(`https://ntfy.tuxnet.es/${topic}/json?since=all&limit=5`, { cache: 'no-store', method: 'GET' });
                 if (response.ok) {
                     setNetworkStatus('ONLINE');
                     const text = await response.text();
@@ -210,12 +210,9 @@ const App: React.FC = () => {
     const sendPushAlert = async (title: string, msg: string) => {
         const topic = configRef.current.ntfyTopic || "merello-planner-2026-global-alerts";
         setPushStatus({ status: 'SENDING', msg: 'Contactando App Externa...' });
-
-        // 🚀 FIRE AND FORGET: No usamos 'await' para NO bloquear instantáneamente las notificaciones locales (Pantalla Roja)
-        // Enviamos un JSON crudo como texto plano (sin header Content-Type) para engañar al navegador
-        // y evitar que envíe la destructiva petición OPTIONS de preflight CORS.
-        // Ntfy detecta automáticamente que es un JSON si empieza por '{'
-        fetch('https://ntfy.sh/', {
+        // 🚀 FIRE AND FORGET: No usamos 'await' para NO bloquear las notificaciones locales.
+        // Enviamos el JSON en texto plano para burlar el OPTIONS Preflight (CORS) de los navegadores móviles.
+        fetch('https://ntfy.tuxnet.es/', {
             method: 'POST',
             body: JSON.stringify({
                 topic: topic,
@@ -225,7 +222,6 @@ const App: React.FC = () => {
                 tags: ['rotating_light', 'vibration']
             })
         }).catch(e => console.error("Error silencioso Ntfy", e));
-
         if (sendP2P) sendP2P({ title, msg, timestamp: Date.now() });
         if (localChannel) localChannel.postMessage({ title, msg });
         setPushStatus({ status: 'SUCCESS', msg: '¡SEÑAL ENVIADA!' });
@@ -282,7 +278,7 @@ const App: React.FC = () => {
                 onExit={() => setUserRole(null)}
                 totalSessionRevenue={data.barSessions?.find(s => !s.isClosed)?.revenue || 0}
                 ticketCounts={getActiveSessionCounts()}
-                onCreateIncident={(t, p, sId, q, term) => { updateData({ incidents: [...data.incidents, { id: Date.now().toString(), title: t, priority: p, status: 'OPEN', timestamp: new Date().toISOString(), stockItemId: sId, quantity: q, terminal: term }] }); sendPushAlert(p === 'URGENT' ? `🚨 ALERTA CAJA` : `🛠️ REPOSICIÓN CAJA`, t); }}
+                onCreateIncident={(t, p, sId, q, term) => { updateData({ incidents: [...data.incidents, { id: Date.now().toString(), title: t, priority: p, status: 'OPEN', timestamp: new Date().toISOString(), stockItemId: sId, quantity: q, terminal: term }] }); sendPushAlert(p === 'URGENT' ? `🚨 URGENCIA: CAJA DE TICKETS` : `🛠️ PEDIDO: CAJA DE TICKETS`, `${t}`); }}
                 onResolveIncident={(id) => updateData({ incidents: data.incidents.map(i => i.id === id ? { ...i, status: 'RESOLVED' } : i) })}
                 onUpdateStock={(id, q) => updateData({ stock: data.stock.map(i => i.id === id ? { ...i, quantity: q } : i) })}
                 onUpdateWorkload={handleKioskWorkloadUpdate}
@@ -345,7 +341,7 @@ const App: React.FC = () => {
                             requestedBy: userRole
                         }]
                     });
-                    sendPushAlert(p === 'URGENT' ? `🚨 ALERTA BARRA` : `🛠️ REPOSICIÓN BARRA`, t);
+                    sendPushAlert(p === 'URGENT' ? `🚨 URGENCIA: BARRA DE VENTA` : `🛠️ PEDIDO: BARRA DE VENTA`, `${t}`);
                 }}
                 onResolveIncident={(id, status) => updateData({ incidents: data.incidents.map(i => i.id === id ? { ...i, status: (status as Incident['status']) || 'RESOLVED' } : i) })}
                 onUpdateStock={(id, q) => updateData({ stock: data.stock.map(i => i.id === id ? { ...i, quantity: q } : i) })}
@@ -410,7 +406,7 @@ const App: React.FC = () => {
                             requestedBy: userRole
                         }]
                     });
-                    sendPushAlert(p === 'URGENT' ? `🚨 ALERTA CASAL` : `🛠️ REPOSICIÓN CASAL`, t);
+                    sendPushAlert(p === 'URGENT' ? `🚨 URGENCIA: BARRA DEL CASAL` : `🛠️ PEDIDO: BARRA DEL CASAL`, `${t}`);
                 }}
                 onResolveIncident={(id, status) => updateData({ incidents: data.incidents.map(i => i.id === id ? { ...i, status: (status as Incident['status']) || 'RESOLVED' } : i) })}
                 onUpdateStock={(id, q) => updateData({ stock: data.stock.map(i => i.id === id ? { ...i, quantity: q } : i) })}

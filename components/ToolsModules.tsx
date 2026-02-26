@@ -64,7 +64,7 @@ const HapticTuner: React.FC<{ config: AppConfig, onUpdate: (c: AppConfig) => voi
    const [showNtfySettings, setShowNtfySettings] = useState(false);
 
    const NTFY_TOPIC = customTopic.trim() || "merello-planner-2026-global-alerts";
-   const NTFY_DEEP_LINK = `ntfy://ntfy.sh/${NTFY_TOPIC}`;
+   const NTFY_DEEP_LINK = `ntfy://ntfy.tuxnet.es/${NTFY_TOPIC}`;
 
    const patterns = [
       { name: 'Estándar (Pulso)', value: [200] },
@@ -87,25 +87,23 @@ const HapticTuner: React.FC<{ config: AppConfig, onUpdate: (c: AppConfig) => voi
       setTimeout(() => setTesting(false), pattern.reduce((a, b) => a + b, 0));
    };
 
-   const testRemoteVibration = async () => {
+   const testRemoteVibration = () => {
       setRemoteTesting(true);
-      try {
-         fetch('https://ntfy.sh/', {
-            method: 'POST',
-            body: JSON.stringify({
-               topic: NTFY_TOPIC,
-               title: 'PRUEBA SISMÓGRAFO',
-               message: "Test de vibración en App Nativa (Prioridad Max)",
-               priority: 5,
-               tags: ['rotating_light', 'vibration']
-            })
-         });
-         toast.success(`Señal enviada al canal: ${NTFY_TOPIC}`);
-      } catch (e) {
-         toast.error('Error al contactar con el puente externo');
-      } finally {
-         setRemoteTesting(false);
-      }
+
+      // Enviamos el JSON en texto plano para evitar el OPTIONS Preflight (CORS) de los navegadores móviles.
+      fetch('https://ntfy.tuxnet.es/', {
+         method: 'POST',
+         body: JSON.stringify({
+            topic: NTFY_TOPIC,
+            title: "PRUEBA SISMÓGRAFO",
+            message: "Test de vibración en App Nativa (Prioridad Max)",
+            priority: 5,
+            tags: ['rotating_light', 'vibration']
+         })
+      }).catch(e => console.error("Error sismógrafo Ntfy", e));
+
+      toast.success(`Señal enviada al canal: ${NTFY_TOPIC}`);
+      setTimeout(() => setRemoteTesting(false), 2000);
    };
 
    const handleSave = () => {

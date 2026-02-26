@@ -88,19 +88,9 @@ export const useAppData = () => {
     setData(prev => {
       const mergedData = { ...prev, ...updates, lastModified: Date.now() };
 
-      // 🐞 FIX CRÍTICO: Firebase odia las propiedades explícitamente "undefined" (ej. en incidentes de hielo)
-      // y lanza un error TypeError SÍNCRONO que colapsa el re-render de React entero.
-      // 1. Usamos JSON parse/stringify para omitir/purgar y limpiar mágicamente todos los nulls/undefined del árbol
-      // 2. Lo metemos en un microtask para sacarlo de la vía crítica de renderizado de React
-      Promise.resolve().then(() => {
-        try {
-          const cleanedData = JSON.parse(JSON.stringify(mergedData));
-          setDoc(doc(db, FIREBASE_DOC_PATH), cleanedData).catch(err => {
-            console.error("Error guardando datos en Firebase:", err);
-          });
-        } catch (e) {
-          console.error("Error en sanitización previa a Firebase:", e);
-        }
+      // Enviar a Firebase de fondo
+      setDoc(doc(db, FIREBASE_DOC_PATH), mergedData).catch(err => {
+        console.error("Error guardando datos en Firebase:", err);
       });
 
       return mergedData;
