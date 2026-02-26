@@ -211,10 +211,16 @@ const App: React.FC = () => {
         const topic = configRef.current.ntfyTopic || "merello-planner-2026-global-alerts";
         setPushStatus({ status: 'SENDING', msg: 'Contactando App Externa...' });
         try {
-            await fetch(`https://ntfy.sh/${topic}`, {
+            await fetch('https://ntfy.sh', {
                 method: 'POST',
-                headers: { 'Title': btoa(unescape(encodeURIComponent(title))), 'Priority': '5', 'Tags': 'rotating_light,vibration' },
-                body: msg
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    topic,
+                    title,
+                    message: msg,
+                    priority: 5,
+                    tags: ['rotating_light', 'vibration']
+                })
             });
         } catch (e) { console.error("Error envío Ntfy", e); }
         if (sendP2P) sendP2P({ title, msg, timestamp: Date.now() });
