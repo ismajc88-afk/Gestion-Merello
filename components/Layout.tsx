@@ -27,13 +27,25 @@ export const Layout: React.FC<LayoutProps> = ({
 }) => {
    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
    const [isFullscreen, setIsFullscreen] = useState(false);
+   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
    useEffect(() => {
       const handleFullscreenChange = () => {
          setIsFullscreen(!!document.fullscreenElement);
       };
+      
+      const handleOnline = () => setIsOffline(false);
+      const handleOffline = () => setIsOffline(true);
+
       document.addEventListener('fullscreenchange', handleFullscreenChange);
-      return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
+      
+      return () => {
+         document.removeEventListener('fullscreenchange', handleFullscreenChange);
+         window.removeEventListener('online', handleOnline);
+         window.removeEventListener('offline', handleOffline);
+      };
    }, []);
 
    const toggleFullscreen = () => {
@@ -217,6 +229,12 @@ export const Layout: React.FC<LayoutProps> = ({
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{peerCount + 1} Conectados</span>
                   <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
                </div>
+               {isOffline && (
+                  <div className="w-full flex items-center justify-center gap-2 py-2 bg-rose-50 border border-rose-200 rounded-xl text-[10px] font-black uppercase text-rose-600 shadow-inner">
+                     <WifiOff size={14} className="animate-pulse" />
+                     Guardando Local...
+                  </div>
+               )}
                <button onClick={toggleFullscreen} className="w-full flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900">
                   {isFullscreen ? <Minimize size={14} /> : <Maximize size={14} />} {isFullscreen ? 'Salir' : 'Pantalla Completa'}
                </button>
@@ -238,7 +256,7 @@ export const Layout: React.FC<LayoutProps> = ({
                   {(currentLabel as any)?.label || 'Merello'}
                </span>
                <div className="w-10 flex justify-end">
-                  {/* Spacer to center title or add right action */}
+                  {isOffline && <WifiOff size={20} className="text-rose-500 animate-pulse" />}
                </div>
             </header>
 

@@ -6,25 +6,27 @@ import { useAppData } from './hooks/useAppData';
 import { useToast } from './hooks/useToast';
 import { LoginScreen } from './components/LoginScreen';
 import { Layout } from './components/Layout';
-import { Dashboard } from './components/Dashboard';
-import { BarManager } from './components/BarManager';
-import { MealPlanner } from './components/MealPlanner';
-import { InventoryManager } from './components/InventoryManager';
-import { CashManager } from './components/CashManager';
-import { BarProfitManager } from './components/BarProfitManager';
-import { StockControl } from './components/StockControl';
-import { PurchasePlanner } from './components/PurchasePlanner';
-import { ShoppingListManager } from './components/ShoppingListManager';
-import { SupplierManager } from './components/SupplierManager';
-import { LogisticsManager } from './components/LogisticsManager';
-import { AttendeeManager } from './components/AttendeeManager';
-import { ReportsManager } from './components/ReportsManager';
-import { AdminControlPanel } from './components/AdminControlPanel';
-import { ToolsManager } from './components/ToolsModules';
-import { HelpGuide } from './components/HelpGuide';
-import { KioskMode } from './components/KioskMode';
-import { AiAssistant } from './components/AiAssistant';
-import { WorkGroupManager } from './components/WorkGroupManager';
+import { ErrorBoundary } from './components/ErrorBoundary';
+
+const Dashboard = React.lazy(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard })));
+const BarManager = React.lazy(() => import('./components/BarManager').then(m => ({ default: m.BarManager })));
+const MealPlanner = React.lazy(() => import('./components/MealPlanner').then(m => ({ default: m.MealPlanner })));
+const InventoryManager = React.lazy(() => import('./components/InventoryManager').then(m => ({ default: m.InventoryManager })));
+const CashManager = React.lazy(() => import('./components/CashManager').then(m => ({ default: m.CashManager })));
+const BarProfitManager = React.lazy(() => import('./components/BarProfitManager').then(m => ({ default: m.BarProfitManager })));
+const StockControl = React.lazy(() => import('./components/StockControl').then(m => ({ default: m.StockControl })));
+const PurchasePlanner = React.lazy(() => import('./components/PurchasePlanner').then(m => ({ default: m.PurchasePlanner })));
+const ShoppingListManager = React.lazy(() => import('./components/ShoppingListManager').then(m => ({ default: m.ShoppingListManager })));
+const SupplierManager = React.lazy(() => import('./components/SupplierManager').then(m => ({ default: m.SupplierManager })));
+const LogisticsManager = React.lazy(() => import('./components/LogisticsManager').then(m => ({ default: m.LogisticsManager })));
+const AttendeeManager = React.lazy(() => import('./components/AttendeeManager').then(m => ({ default: m.AttendeeManager })));
+const ReportsManager = React.lazy(() => import('./components/ReportsManager').then(m => ({ default: m.ReportsManager })));
+const AdminControlPanel = React.lazy(() => import('./components/AdminControlPanel').then(m => ({ default: m.AdminControlPanel })));
+const ToolsManager = React.lazy(() => import('./components/ToolsModules').then(m => ({ default: m.ToolsManager })));
+const HelpGuide = React.lazy(() => import('./components/HelpGuide').then(m => ({ default: m.HelpGuide })));
+const KioskMode = React.lazy(() => import('./components/KioskMode').then(m => ({ default: m.KioskMode })));
+const AiAssistant = React.lazy(() => import('./components/AiAssistant').then(m => ({ default: m.AiAssistant })));
+const WorkGroupManager = React.lazy(() => import('./components/WorkGroupManager').then(m => ({ default: m.WorkGroupManager })));
 import { Task, KioskWorkload, TransactionType, TicketItem, Incident, AuditLogEntry, AuditActionType, SubBudgetLine } from './types';
 import { Bell, CheckCircle2, Wifi, AlertTriangle, WifiOff, Users, Globe, Siren, RefreshCw, Radio, Volume2, Play, Smartphone, Download, Copy, X, Check, Zap, ExternalLink } from 'lucide-react';
 
@@ -590,8 +592,14 @@ const App: React.FC = () => {
         <Layout currentView={currentView} onChangeView={setCurrentView} onOpenAI={() => setIsAiOpen(true)} userRole={userRole} onLogout={() => setUserRole(null)} peerCount={peerCount} onForceSync={() => { }} appConfig={data.appConfig}>
             <GlobalAlertOverlay />
             <audio ref={silentAudioRef} src={SILENT_MP3} loop muted style={{ display: 'none' }} />
-            {renderContent()}
-            <AiAssistant isOpen={isAiOpen} onClose={() => setIsAiOpen(false)} appData={data} />
+            <ErrorBoundary>
+                <React.Suspense fallback={<div className="flex h-full items-center justify-center p-8 w-full"><div className="w-12 h-12 rounded-full border-4 border-emerald-500/20 border-t-emerald-500 animate-spin"></div></div>}>
+                    {renderContent()}
+                </React.Suspense>
+            </ErrorBoundary>
+            <React.Suspense fallback={null}>
+                <AiAssistant isOpen={isAiOpen} onClose={() => setIsAiOpen(false)} appData={data} />
+            </React.Suspense>
         </Layout>
     );
 };

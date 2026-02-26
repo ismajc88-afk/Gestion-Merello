@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { AppData, DEFAULT_DATA, UserRole, Transaction, TransactionType } from '../types';
 import { db, doc, onSnapshot, setDoc } from '../services/firebase';
 
@@ -83,15 +83,23 @@ export const useAppData = () => {
     return () => unsub();
   }, []);
 
-  // 3. Helper de actualización genérico (Escribe en React State optimista y luego en Firebase)
+  const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  // 3. Helper de actualización genérico (Escribe en React State optimista y luego en Firebase con BATCHING)
   const updateData = useCallback((updates: Partial<AppData>) => {
     setData(prev => {
       const mergedData = { ...prev, ...updates, lastModified: Date.now() };
 
-      // Enviar a Firebase de fondo
-      setDoc(doc(db, FIREBASE_DOC_PATH), mergedData).catch(err => {
-        console.error("Error guardando datos en Firebase:", err);
-      });
+      // BATCHING: Evita freír la cuota de Firebase. Espera 3s agrupando peticiones antes de subir.
+      if (debounceTimeout.current) {
+        clearTimeout(debounceTimeout.current);
+      }
+
+      debounceTimeout.current = setTimeout(() => {
+        setDoc(doc(db, FIREBASE_DOC_PATH), mergedData).catch(err => {
+          console.error("Error guardando datos en Firebase (Batch):", err);
+        });
+      }, 3000);
 
       return mergedData;
     });
