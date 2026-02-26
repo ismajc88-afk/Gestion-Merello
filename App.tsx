@@ -210,19 +210,19 @@ const App: React.FC = () => {
     const sendPushAlert = async (title: string, msg: string) => {
         const topic = configRef.current.ntfyTopic || "merello-planner-2026-global-alerts";
         setPushStatus({ status: 'SENDING', msg: 'Contactando App Externa...' });
-        try {
-            await fetch('https://ntfy.sh', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    topic,
-                    title,
-                    message: msg,
-                    priority: 5,
-                    tags: ['rotating_light', 'vibration']
-                })
-            });
-        } catch (e) { console.error("Error envío Ntfy", e); }
+
+        // 🚀 FIRE AND FORGET: No usamos 'await' para NO bloquear instantáneamente las notificaciones locales (Pantalla Roja)
+        // Además, usamos URL params en vez de JSON o Headers para evitar la destructiva petición OPTIONS de CORS
+        const url = new URL(`https://ntfy.sh/${encodeURIComponent(topic)}`);
+        url.searchParams.append('title', title);
+        url.searchParams.append('priority', '5');
+        url.searchParams.append('tags', 'rotating_light,vibration');
+
+        fetch(url.toString(), {
+            method: 'POST',
+            body: msg
+        }).catch(e => console.error("Error silencioso Ntfy", e));
+
         if (sendP2P) sendP2P({ title, msg, timestamp: Date.now() });
         if (localChannel) localChannel.postMessage({ title, msg });
         setPushStatus({ status: 'SUCCESS', msg: '¡SEÑAL ENVIADA!' });
