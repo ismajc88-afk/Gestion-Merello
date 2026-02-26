@@ -13,8 +13,8 @@ import {
 import { SyncModules } from './SyncModules';
 import { RolePermissionsPanel } from './RolePermissionsPanel';
 import { AuditLog } from './AuditLog';
-import { History } from 'lucide-react';
-import { db, doc, setDoc } from '../services/firebase';
+import { History, DownloadCloud } from 'lucide-react';
+import { db, doc, setDoc, addDoc, collection, getDocs, query, orderBy, limit } from '../services/firebase';
 
 interface Props {
    data: AppData;
@@ -36,6 +36,77 @@ export const AdminControlPanel: React.FC<Props> = ({ data, onUpdateConfig, onRes
 
    // New Ticket Form State
    const [newTicket, setNewTicket] = useState({ name: '', price: '1.00', category: 'ALCOHOL' });
+
+   // Backups State
+   const [backups, setBackups] = useState<any[]>([]);
+   const [isBackingUp, setIsBackingUp] = useState(false);
+
+   // Carga de Backups Históricos
+   const loadBackups = async () => {
+      try {
+         const q = query(collection(db, 'falla_backups', 'merello2026', 'history'), orderBy('timestamp', 'desc'), limit(15));
+         const snapshot = await getDocs(q);
+         const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+         setBackups(list);
+      } catch (err) {
+         console.warn("No se pudieron cargar los backups:", err);
+      }
+   };
+
+   React.useEffect(() => {
+      if (activeTab === 'SYNC') loadBackups();
+   }, [activeTab]);
+
+   // Backup Automático Diario a las 04:00 AM
+   React.useEffect(() => {
+      const runAutoBackup = async () => {
+         const now = new Date();
+         if (now.getHours() >= 4) {
+            const dateStr = now.toLocaleDateString('es-ES');
+            const lastAuto = localStorage.getItem('merello_last_auto_backup');
+            if (lastAuto !== dateStr) {
+               try {
+                  await addDoc(collection(db, 'falla_backups', 'merello2026', 'history'), {
+                     timestamp: now.toISOString(),
+                     trigger: 'AUTO_NIGHT_BACKUP',
+                     data: data
+                  });
+                  localStorage.setItem('merello_last_auto_backup', dateStr);
+                  console.log("Auto-backup completado con éxito a las 4 AM.");
+               } catch (e) { console.error("Fallo auto-backup", e); }
+            }
+         }
+      };
+      runAutoBackup();
+   }, []);
+
+   const createManualBackup = async () => {
+      setIsBackingUp(true);
+      try {
+         await addDoc(collection(db, 'falla_backups', 'merello2026', 'history'), {
+            timestamp: new Date().toISOString(),
+            trigger: 'MANUAL_ADMIN',
+            data: data
+         });
+         alert("✅ Copia de Seguridad generada y guardada en la Nube.");
+         loadBackups();
+      } catch (err) {
+         alert("❌ Error creando backup: " + err);
+      }
+      setIsBackingUp(false);
+   };
+
+   const restoreBackup = async (backupData: AppData) => {
+      if (!confirm("⚠️ ATENCIÓN: Vas a sobreescribir la Base de Datos actual con esta copia pasada. Todos los cambios recientes se perderán irreversiblemente. ¿Estás absolutamente seguro?")) return;
+      if (!confirm("⚠️ DOBLE CONFIRMACIÓN: ¿Restaurar Base de Datos a la copia seleccionada?")) return;
+      try {
+         await setDoc(doc(db, 'falla/merello2026'), backupData);
+         alert("✅ RESTAURACIÓN COMPLETADA. La app se recargará ahora.");
+         window.location.reload();
+      } catch (err) {
+         alert("❌ Error al restaurar: " + err);
+      }
+   };
 
    const handleSave = () => {
       onUpdateConfig(config);
@@ -466,39 +537,63 @@ export const AdminControlPanel: React.FC<Props> = ({ data, onUpdateConfig, onRes
                   </div>
                )}
 
-               {/* TEMA: SYNC / NUBE MANUAL */}
+               {/* TEMA: SYNC / BACKUPS */}
                {activeTab === 'SYNC' && (
                   <div className="animate-in slide-in-from-bottom-4 h-full space-y-6">
 
-                     <div className="bg-indigo-50 p-8 rounded-[40px] border-2 border-indigo-100 flex flex-col md:flex-row items-center justify-between gap-6">
-                        <div>
-                           <h3 className="font-black text-indigo-900 text-xl flex items-center gap-2">
-                              <Cloud className="text-indigo-500" /> Nube Inteligente (Firebase)
+                     {/* Panel de Copias de Seguridad */}
+                     <div className="bg-slate-900 p-8 rounded-[40px] border border-slate-800 text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl relative overflow-hidden">
+                        <div className="absolute -right-10 opacity-5 pointer-events-none"><DownloadCloud size={200} /></div>
+                        <div className="relative z-10 w-full md:w-auto">
+                           <h3 className="font-black text-2xl flex items-center gap-3 uppercase italic tracking-tighter">
+                              <ShieldCheck className="text-emerald-400" size={28} /> Bóveda de Backups
                            </h3>
-                           <p className="text-indigo-600/80 text-sm mt-2 font-medium">Sube todos los datos locales actuales de este dispositivo a la base de datos central. Ideal para la primera migración o forzar respaldos.</p>
+                           <p className="text-slate-400 text-sm mt-2 font-medium max-w-sm">Genera una copia de seguridad instantánea ("Snapshot") de <b>TODA</b> la Falla en este exacto segundo. El sistema también hace copias automáticas a las <span className="text-emerald-400">04:00 AM</span>.</p>
                         </div>
                         <button
-                           onClick={async () => {
-                              if (confirm("⚠️ ¿Estás seguro de que quieres sobreescribir la Base de Datos en la nube con la memoria actual de este dispositivo?")) {
-                                 try {
-                                    await setDoc(doc(db, 'falla/merello2026'), data);
-                                    alert('✅ Datos volcados a Firebase con éxito. Deberías verlos en la consola de Firebase.');
-                                 } catch (error: any) {
-                                    alert('❌ Error al subir: ' + error.message);
-                                 }
-                              }
-                           }}
-                           className="bg-indigo-600 hover:bg-indigo-700 text-white font-black px-6 py-4 rounded-2xl flex items-center gap-2 whitespace-nowrap shadow-lg transition-transform active:scale-95"
+                           disabled={isBackingUp}
+                           onClick={createManualBackup}
+                           className="w-full md:w-auto bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-black px-8 py-5 rounded-[24px] flex items-center justify-center gap-2 whitespace-nowrap shadow-[0_0_30px_rgba(16,185,129,0.3)] transition-all active:scale-95 disabled:opacity-50 relative z-10 text-xs uppercase tracking-widest"
                         >
-                           <UploadCloud size={20} /> Forzar Subida a Nube
+                           {isBackingUp ? <RefreshCw className="animate-spin" size={20} /> : <DownloadCloud size={20} />}
+                           Crear INSTANTÁNEA NOW
                         </button>
                      </div>
 
-                     {onFullImport ? (
-                        <SyncModules data={data} onImport={onFullImport} />
-                     ) : (
-                        <div className="p-10 text-center bg-slate-50 rounded-[40px]">Error: Módulo de sincronización no disponible.</div>
-                     )}
+                     {/* Historial de Backups */}
+                     <div className="bg-white p-8 rounded-[40px] border-2 border-slate-100 shadow-sm space-y-4">
+                        <h4 className="font-black text-slate-800 uppercase text-xs tracking-widest mb-6">Historial y Restauración</h4>
+                        {backups.length === 0 ? (
+                           <div className="p-8 text-center text-slate-400 bg-slate-50 rounded-3xl font-bold uppercase text-xs tracking-widest">No hay copias de seguridad aún</div>
+                        ) : (
+                           <div className="grid gap-3">
+                              {backups.map(b => (
+                                 <div key={b.id} className="flex flex-col md:flex-row items-start md:items-center justify-between p-5 bg-slate-50 border border-slate-200 rounded-3xl hover:bg-white transition-colors group">
+                                    <div className="mb-4 md:mb-0">
+                                       <div className="flex items-center gap-2 mb-1">
+                                          <Database size={14} className="text-indigo-500" />
+                                          <span className="font-black text-slate-800 tracking-tight text-sm">
+                                             {new Date(b.timestamp).toLocaleString('es-ES', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).toUpperCase()}
+                                          </span>
+                                       </div>
+                                       <div className="flex gap-2">
+                                          <span className="text-[9px] font-black uppercase tracking-widest bg-slate-200 text-slate-500 px-2 py-1 rounded-md">ID: {b.id.substring(0,6)}...</span>
+                                          <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${b.trigger === 'AUTO_NIGHT_BACKUP' ? 'bg-indigo-100 text-indigo-600' : 'bg-orange-100 text-orange-600'}`}>
+                                             {b.trigger === 'AUTO_NIGHT_BACKUP' ? 'Auto Cierre (4AM)' : 'Admin Manual'}
+                                          </span>
+                                       </div>
+                                    </div>
+                                    <button 
+                                       onClick={() => restoreBackup(b.data)}
+                                       className="w-full md:w-auto px-6 py-3 bg-white border-2 border-rose-100 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex justify-center items-center gap-2 transition-all opacity-80 group-hover:opacity-100"
+                                    >
+                                       <RefreshCw size={14} /> Restaurar Falla a la Copia
+                                    </button>
+                                 </div>
+                              ))}
+                           </div>
+                        )}
+                     </div>
                   </div>
                )}
 
