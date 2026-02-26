@@ -212,15 +212,18 @@ const App: React.FC = () => {
         setPushStatus({ status: 'SENDING', msg: 'Contactando App Externa...' });
 
         // 🚀 FIRE AND FORGET: No usamos 'await' para NO bloquear instantáneamente las notificaciones locales (Pantalla Roja)
-        // Además, usamos URL params en vez de JSON o Headers para evitar la destructiva petición OPTIONS de CORS
-        const url = new URL(`https://ntfy.sh/${encodeURIComponent(topic)}`);
-        url.searchParams.append('title', title);
-        url.searchParams.append('priority', '5');
-        url.searchParams.append('tags', 'rotating_light,vibration');
-
-        fetch(url.toString(), {
+        // Enviamos un JSON crudo como texto plano (sin header Content-Type) para engañar al navegador
+        // y evitar que envíe la destructiva petición OPTIONS de preflight CORS.
+        // Ntfy detecta automáticamente que es un JSON si empieza por '{'
+        fetch('https://ntfy.sh/', {
             method: 'POST',
-            body: msg
+            body: JSON.stringify({
+                topic: topic,
+                title: title,
+                message: msg,
+                priority: 5,
+                tags: ['rotating_light', 'vibration']
+            })
         }).catch(e => console.error("Error silencioso Ntfy", e));
 
         if (sendP2P) sendP2P({ title, msg, timestamp: Date.now() });

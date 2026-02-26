@@ -90,14 +90,15 @@ const HapticTuner: React.FC<{ config: AppConfig, onUpdate: (c: AppConfig) => voi
    const testRemoteVibration = async () => {
       setRemoteTesting(true);
       try {
-         const url = new URL(`https://ntfy.sh/${encodeURIComponent(NTFY_TOPIC)}`);
-         url.searchParams.append('title', 'PRUEBA SISMÓGRAFO');
-         url.searchParams.append('priority', '5');
-         url.searchParams.append('tags', 'rotating_light,vibration');
-
-         await fetch(url.toString(), {
+         fetch('https://ntfy.sh/', {
             method: 'POST',
-            body: "Test de vibración en App Nativa (Prioridad Max)"
+            body: JSON.stringify({
+               topic: NTFY_TOPIC,
+               title: 'PRUEBA SISMÓGRAFO',
+               message: "Test de vibración en App Nativa (Prioridad Max)",
+               priority: 5,
+               tags: ['rotating_light', 'vibration']
+            })
          });
          toast.success(`Señal enviada al canal: ${NTFY_TOPIC}`);
       } catch (e) {
