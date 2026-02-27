@@ -61,13 +61,13 @@ const BudgetView: React.FC<{ data: AppData }> = ({ data }) => {
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const income = data.transactions.filter(t => t.type === TransactionType.INCOME).reduce((a, t) => a + t.amount, 0);
-  const expenses = data.transactions.filter(t => t.type === TransactionType.EXPENSE).reduce((a, t) => a + t.amount, 0);
+  const income = data.transactions?.filter(t => t.type === TransactionType.INCOME).reduce((a, t) => a + t.amount, 0) || 0;
+  const expenses = data.transactions?.filter(t => t.type === TransactionType.EXPENSE).reduce((a, t) => a + t.amount, 0) || 0;
   const limit = data.budgetLimit || 0;
   const remaining = limit - expenses;
   const usedPct = pct(expenses, limit);
   const byCategory: Record<string, number> = {};
-  data.transactions.filter(t => t.type === TransactionType.EXPENSE).forEach(t => {
+  data.transactions?.filter(t => t.type === TransactionType.EXPENSE).forEach(t => {
     byCategory[t.category] = (byCategory[t.category] || 0) + t.amount;
   });
   const topCategories = Object.entries(byCategory).sort((a, b) => b[1] - a[1]).slice(0, 5);
@@ -278,12 +278,12 @@ const CashView: React.FC<{ data: AppData }> = ({ data }) => {
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const today = getTodayStr();
-  const todayTx = data.transactions.filter(t => t.date?.startsWith(today));
-  const todayIncome = todayTx.filter(t => t.type === TransactionType.INCOME).reduce((a, t) => a + t.amount, 0);
-  const todayExpenses = todayTx.filter(t => t.type === TransactionType.EXPENSE).reduce((a, t) => a + t.amount, 0);
+  const todayTx = data.transactions?.filter(t => t.date?.startsWith(today)) || [];
+  const todayIncome = todayTx.filter(t => t.type === TransactionType.INCOME).reduce((a, t) => a + t.amount, 0) || 0;
+  const todayExpenses = todayTx.filter(t => t.type === TransactionType.EXPENSE).reduce((a, t) => a + t.amount, 0) || 0;
   const todayBalance = todayIncome - todayExpenses;
-  const totalIncome = data.transactions.filter(t => t.type === TransactionType.INCOME).reduce((a, t) => a + t.amount, 0);
-  const totalExpenses = data.transactions.filter(t => t.type === TransactionType.EXPENSE).reduce((a, t) => a + t.amount, 0);
+  const totalIncome = data.transactions?.filter(t => t.type === TransactionType.INCOME).reduce((a, t) => a + t.amount, 0) || 0;
+  const totalExpenses = data.transactions?.filter(t => t.type === TransactionType.EXPENSE).reduce((a, t) => a + t.amount, 0) || 0;
 
   const analyze = async () => {
     setLoading(true);
@@ -432,8 +432,8 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({ isOpen, onClose, appDa
     setLoading(true);
     const ctx = JSON.stringify({
       presupuesto_limite: appData.budgetLimit,
-      total_gastado: appData.transactions.filter(t => t.type === TransactionType.EXPENSE).reduce((a, t) => a + t.amount, 0),
-      total_ingresos: appData.transactions.filter(t => t.type === TransactionType.INCOME).reduce((a, t) => a + t.amount, 0),
+      total_gastado: appData.transactions?.filter(t => t.type === TransactionType.EXPENSE).reduce((a, t) => a + t.amount, 0) || 0,
+      total_ingresos: appData.transactions?.filter(t => t.type === TransactionType.INCOME).reduce((a, t) => a + t.amount, 0) || 0,
       falleros: appData.members?.length,
       stock_critico: appData.stock?.filter(s => s.quantity <= s.minStock).map(s => s.name),
       compra_urgente: appData.shoppingList?.filter(i => !i.checked && i.priority === 'HIGH').map(i => i.name),

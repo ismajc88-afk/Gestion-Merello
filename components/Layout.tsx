@@ -5,7 +5,7 @@ import {
    Calculator, Monitor, Settings, FileText,
    Truck, ClipboardList, Utensils, PieChart, ShoppingBag,
    ChevronRight, Sparkles, LogOut, User as UserIcon, HelpCircle,
-   Boxes, Menu, X, Maximize, Minimize, HardHat
+   Boxes, Menu, X, Maximize, Minimize, HardHat, WifiOff
 } from 'lucide-react';
 import { UserRole, AppConfig } from '../types';
 import { usePermissions } from '../hooks/usePermissions';
@@ -33,14 +33,14 @@ export const Layout: React.FC<LayoutProps> = ({
       const handleFullscreenChange = () => {
          setIsFullscreen(!!document.fullscreenElement);
       };
-      
+
       const handleOnline = () => setIsOffline(false);
       const handleOffline = () => setIsOffline(true);
 
       document.addEventListener('fullscreenchange', handleFullscreenChange);
       window.addEventListener('online', handleOnline);
       window.addEventListener('offline', handleOffline);
-      
+
       return () => {
          document.removeEventListener('fullscreenchange', handleFullscreenChange);
          window.removeEventListener('online', handleOnline);
@@ -268,12 +268,14 @@ export const Layout: React.FC<LayoutProps> = ({
             </div>
 
             {/* AI FLOATING ACTION BUTTON (Mobile Optimized) */}
-            <button
-               onClick={onOpenAI}
-               className="fixed bottom-6 right-4 md:bottom-10 md:right-10 w-14 h-14 md:w-16 md:h-16 bg-blue-600 text-white rounded-full shadow-[0_8px_30px_rgba(37,99,235,0.4)] flex items-center justify-center z-40 active:scale-90 transition-transform safe-mb"
-            >
-               <Sparkles size={28} className="fill-white/20" />
-            </button>
+            {isAllowed('ai') && (
+               <button
+                  onClick={onOpenAI}
+                  className="fixed bottom-6 right-4 md:bottom-10 md:right-10 w-14 h-14 md:w-16 md:h-16 bg-blue-600 text-white rounded-full shadow-[0_8px_30px_rgba(37,99,235,0.4)] flex items-center justify-center z-40 active:scale-90 transition-transform safe-mb"
+               >
+                  <Sparkles size={28} className="fill-white/20" />
+               </button>
+            )}
 
          </main>
       </div>

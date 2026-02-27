@@ -33,6 +33,7 @@ export const ALL_MODULES: ModuleDefinition[] = [
   // Economía
   { id: 'dashboard', label: 'Inicio / Panel', section: 'General' },
   { id: 'help', label: 'Ayuda', section: 'General' },
+  { id: 'ai', label: 'Asistente Merello AI', section: 'General' },
   { id: 'inventory', label: 'Presupuesto', section: 'Economía' },
   { id: 'cash', label: 'Tesorería', section: 'Economía' },
   { id: 'reports', label: 'Informes', section: 'Economía' },
@@ -84,8 +85,8 @@ const ALL_IDS = ALL_MODULES.map(m => m.id);
 export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, ModulePermissions>> = {
   ADMIN: generatePermsMap(ALL_IDS),
   PRESIDENTE: generatePermsMap(ALL_IDS.filter(id => id !== 'kiosk')),
-  TESORERIA: generatePermsMap(['dashboard', 'help', 'inventory', 'cash', 'reports', 'bar-profit']),
-  LOGISTICA: generatePermsMap(['dashboard', 'help', 'stock', 'purchase', 'shopping', 'suppliers', 'logistics', 'work-groups', 'kiosk']),
+  TESORERIA: generatePermsMap(['dashboard', 'help', 'inventory', 'cash', 'reports', 'bar-profit', 'ai']),
+  LOGISTICA: generatePermsMap(['dashboard', 'help', 'stock', 'purchase', 'shopping', 'suppliers', 'logistics', 'work-groups', 'kiosk', 'ai']),
   BARRA: generatePermsMap(['dashboard', 'help', 'bar', 'stock', 'bar-profit', 'logistics']),
   CAMARERO: generatePermsMap(['kiosk']),
   CAJERO: generatePermsMap(['kiosk']),

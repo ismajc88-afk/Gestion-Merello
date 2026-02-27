@@ -47,8 +47,8 @@ export const MealPlanner: React.FC<Props> = ({ mealEvents, onUpdateEvents, onAdd
 
     // --- LÓGICA DE ANÁLISIS VISUAL ---
     const analyzeRation = (qty: number, unit: string, itemName: string) => {
-        const u = unit.toLowerCase();
-        const n = itemName.toLowerCase();
+        const u = unit?.toLowerCase() || '';
+        const n = itemName?.toLowerCase() || '';
 
         let category = 'GENÉRICO';
         let advice = 'Estándar';

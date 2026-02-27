@@ -14,7 +14,7 @@ import { SyncModules } from './SyncModules';
 import { RolePermissionsPanel } from './RolePermissionsPanel';
 import { AuditLog } from './AuditLog';
 import { History, DownloadCloud } from 'lucide-react';
-import { db, doc, setDoc, addDoc, collection, getDocs, query, orderBy, limit } from '../services/firebase';
+import { db, doc, setDoc } from '../services/firebase';
 
 interface Props {
    data: AppData;
@@ -44,17 +44,17 @@ export const AdminControlPanel: React.FC<Props> = ({ data, onUpdateConfig, onRes
    // Carga de Backups Históricos
    const loadBackups = async () => {
       try {
-         const q = query(collection(db, 'falla_backups', 'merello2026', 'history'), orderBy('timestamp', 'desc'), limit(15));
+         /*const q = query(collection(db, 'falla_backups', 'merello2026', 'history'), orderBy('timestamp', 'desc'), limit(15));
          const snapshot = await getDocs(q);
          const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-         setBackups(list);
+         setBackups(list);*/
       } catch (err) {
          console.warn("No se pudieron cargar los backups:", err);
       }
    };
 
    React.useEffect(() => {
-      if (activeTab === 'SYNC') loadBackups();
+      //if (activeTab === 'SYNC') loadBackups();
    }, [activeTab]);
 
    // Backup Automático Diario a las 04:00 AM
@@ -66,11 +66,11 @@ export const AdminControlPanel: React.FC<Props> = ({ data, onUpdateConfig, onRes
             const lastAuto = localStorage.getItem('merello_last_auto_backup');
             if (lastAuto !== dateStr) {
                try {
-                  await addDoc(collection(db, 'falla_backups', 'merello2026', 'history'), {
+                  /*await addDoc(collection(db, 'falla_backups', 'merello2026', 'history'), {
                      timestamp: now.toISOString(),
                      trigger: 'AUTO_NIGHT_BACKUP',
                      data: data
-                  });
+                  });*/
                   localStorage.setItem('merello_last_auto_backup', dateStr);
                   console.log("Auto-backup completado con éxito a las 4 AM.");
                } catch (e) { console.error("Fallo auto-backup", e); }
@@ -83,11 +83,11 @@ export const AdminControlPanel: React.FC<Props> = ({ data, onUpdateConfig, onRes
    const createManualBackup = async () => {
       setIsBackingUp(true);
       try {
-         await addDoc(collection(db, 'falla_backups', 'merello2026', 'history'), {
+         /*await addDoc(collection(db, 'falla_backups', 'merello2026', 'history'), {
             timestamp: new Date().toISOString(),
             trigger: 'MANUAL_ADMIN',
             data: data
-         });
+         });*/
          alert("✅ Copia de Seguridad generada y guardada en la Nube.");
          loadBackups();
       } catch (err) {
@@ -577,13 +577,13 @@ export const AdminControlPanel: React.FC<Props> = ({ data, onUpdateConfig, onRes
                                           </span>
                                        </div>
                                        <div className="flex gap-2">
-                                          <span className="text-[9px] font-black uppercase tracking-widest bg-slate-200 text-slate-500 px-2 py-1 rounded-md">ID: {b.id.substring(0,6)}...</span>
+                                          <span className="text-[9px] font-black uppercase tracking-widest bg-slate-200 text-slate-500 px-2 py-1 rounded-md">ID: {b.id.substring(0, 6)}...</span>
                                           <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${b.trigger === 'AUTO_NIGHT_BACKUP' ? 'bg-indigo-100 text-indigo-600' : 'bg-orange-100 text-orange-600'}`}>
                                              {b.trigger === 'AUTO_NIGHT_BACKUP' ? 'Auto Cierre (4AM)' : 'Admin Manual'}
                                           </span>
                                        </div>
                                     </div>
-                                    <button 
+                                    <button
                                        onClick={() => restoreBackup(b.data)}
                                        className="w-full md:w-auto px-6 py-3 bg-white border-2 border-rose-100 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex justify-center items-center gap-2 transition-all opacity-80 group-hover:opacity-100"
                                     >

@@ -39,8 +39,8 @@ export const CashManager: React.FC<Props> = ({ data, onAddTransaction, userRole 
         return data.transactions
             .filter(t => {
                 const tDate = new Date(t.date).getTime();
-                const matchesSearch = t.description.toLowerCase().includes(search.toLowerCase()) ||
-                    t.category.toLowerCase().includes(search.toLowerCase());
+                const matchesSearch = t.description?.toLowerCase().includes(search.toLowerCase()) ||
+                    t.category?.toLowerCase().includes(search.toLowerCase());
 
                 let matchesTime = true;
                 if (filter === 'TODAY') matchesTime = tDate >= todayStart;
