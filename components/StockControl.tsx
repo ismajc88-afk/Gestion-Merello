@@ -51,11 +51,12 @@ export const StockControl: React.FC<Props> = ({
    }, [categories, categoryDefs]);
 
    // Helper to format category > subcategory for display
-   const formatCategory = (catId: string, subId?: string) => {
+   const formatCategory = (catId?: string, subId?: string) => {
+      if (!catId) return 'SIN CATEGORÍA';
       const cat = categoryDefs.find(c => c.id === catId);
       if (!cat) return catId;
       if (!subId) return cat.name.toUpperCase();
-      const sub = cat.subcategories.find(s => s.id === subId);
+      const sub = cat.subcategories?.find(s => s.id === subId);
       return sub ? `${cat.name.toUpperCase()} > ${sub.name.toUpperCase()}` : cat.name.toUpperCase();
    };
 
@@ -258,7 +259,7 @@ export const StockControl: React.FC<Props> = ({
                      <div className="flex justify-between items-start mb-4">
                         <div className="flex items-center gap-3 md:gap-4 overflow-hidden">
                            <div className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${isOverLimit ? 'bg-rose-500 text-white animate-pulse' : iconBg}`}>
-                              {isOverLimit ? <ShieldAlert size={20} className="md:w-6 md:h-6" /> : item.category.includes('BEBIDA') ? <Wine size={20} className="md:w-6 md:h-6" /> : <Utensils size={20} className="md:w-6 md:h-6" />}
+                              {isOverLimit ? <ShieldAlert size={20} className="md:w-6 md:h-6" /> : item.category?.includes('BEBIDA') ? <Wine size={20} className="md:w-6 md:h-6" /> : <Utensils size={20} className="md:w-6 md:h-6" />}
                            </div>
                            <div className="min-w-0 flex-1">
                               <div className="flex flex-col gap-0.5 mb-1.5 align-start">
@@ -391,7 +392,7 @@ export const StockControl: React.FC<Props> = ({
                               <label className="text-[9px] font-bold text-slate-400 uppercase ml-2 mb-1 block">Subcategoría</label>
                               <select value={newItem.subCategory || ''} onChange={e => setNewItem({ ...newItem, subCategory: e.target.value })} className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-xs uppercase outline-none">
                                  <option value="">(Ninguna)</option>
-                                 {activeCategories.find(c => c.id === newItem.category)?.subcategories.map(s => (
+                                 {activeCategories.find(c => c.id === newItem.category)?.subcategories?.map(s => (
                                     <option key={s.id} value={s.id}>{s.name}</option>
                                  ))}
                               </select>
@@ -480,7 +481,7 @@ export const StockControl: React.FC<Props> = ({
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Subcategoría</label>
                                     <select value={editingItem.subCategory || ''} onChange={e => setEditingItem({ ...editingItem, subCategory: e.target.value })} className="w-full p-4 bg-white border-2 border-slate-100 rounded-2xl font-bold text-xs uppercase outline-none">
                                        <option value="">(Ninguna)</option>
-                                       {activeCategories.find(c => c.id === editingItem.category)?.subcategories.map(s => (
+                                       {activeCategories.find(c => c.id === editingItem.category)?.subcategories?.map(s => (
                                           <option key={s.id} value={s.id}>{s.name}</option>
                                        ))}
                                     </select>

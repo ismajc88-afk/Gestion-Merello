@@ -523,7 +523,7 @@ export const KioskMode: React.FC<KioskModeProps> = ({
                                         ? 'bg-amber-500/20 text-amber-300 shadow-amber-500/20'
                                         : 'bg-blue-500/20 text-blue-300 shadow-blue-500/20'
                                         }`}>
-                                        {item.category.includes('BEBIDA') ? <Wine size={20} /> : <Package size={20} />}
+                                        {item.category?.includes('BEBIDA') ? <Wine size={20} /> : <Package size={20} />}
                                     </div>
                                     {isLow && (
                                         <div className="flex items-center gap-1 bg-amber-500/90 text-amber-950 px-2.5 py-1 rounded-full shadow-lg animate-pulse">

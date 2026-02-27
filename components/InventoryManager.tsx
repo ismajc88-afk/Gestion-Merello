@@ -428,7 +428,7 @@ export const InventoryManager: React.FC<Props> = ({ data, userRole, onUpdateBudg
                         <div className="flex flex-col md:flex-row justify-between items-center gap-8 relative z-10">
                            <div className="flex items-center gap-6 w-full md:w-auto">
                               <div className={`w-16 h-16 rounded-3xl flex items-center justify-center transition-all ${cat.status === 'DANGER' ? 'bg-rose-50 text-white rotate-12' : 'bg-slate-50 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600'}`}>
-                                 {cat.category.includes('Bebida') ? <Wine size={28} /> : <Utensils size={28} />}
+                                 {cat.category?.includes('Bebida') ? <Wine size={28} /> : <Utensils size={28} />}
                               </div>
                               <div>
                                  <h4 className="font-black text-slate-900 text-xl tracking-tighter mb-1 uppercase italic">{cat.category}</h4>

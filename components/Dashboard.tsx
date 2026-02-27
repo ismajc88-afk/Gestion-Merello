@@ -139,16 +139,56 @@ export const Dashboard: React.FC<Props> = ({ data, onResolveIncident, userRole }
         <div className="space-y-4 md:space-y-6 pb-24">
 
             {/* 1. HEADER */}
-            <div className="flex flex-col md:flex-row justify-between items-start gap-2">
+            <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-6">
                 <div>
-                    <h1 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tight uppercase italic">
+                    <h1 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tight uppercase italic flex items-center gap-3">
                         {isFallero ? 'Mi Zona' : 'Centro de Mando'}
+                        <div className="hidden md:flex items-center text-[10px] font-black uppercase tracking-widest bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full not-italic">
+                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse mr-2"></div>
+                            Sistema Operativo
+                        </div>
                     </h1>
-                    <p className="text-xs md:text-sm font-bold text-slate-400 uppercase tracking-widest">
+                    <p className="text-xs md:text-sm font-bold text-slate-400 uppercase tracking-widest mt-1">
                         Estado de la Falla: <span className="text-emerald-600">En Marcha</span>
                     </p>
                 </div>
+                {!isFallero && (
+                    <div className="bg-slate-900 text-white p-4 rounded-3xl shadow-xl flex items-center gap-6 self-stretch min-w-[280px]">
+                        <div className="p-3 bg-emerald-500/20 text-emerald-400 rounded-2xl">
+                            <Wallet size={24} />
+                        </div>
+                        <div>
+                            <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Arqueo Actual Total</p>
+                            <p className="text-2xl font-black tabular-nums tracking-tighter">
+                                {transactions.reduce((acc, t) => t.type === TransactionType.INCOME ? acc + t.amount : acc - t.amount, 0).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
+                            </p>
+                        </div>
+                    </div>
+                )}
             </div>
+
+            {/* PANEL DE ALERTAS ROJAS (100% SEGURO) */}
+            {!isFallero && lowStockItems.length > 0 && (
+                <div className="bg-rose-50 border-2 border-rose-200 p-4 rounded-3xl shadow-sm flex items-start md:items-center gap-4 animate-in slide-in-from-top-2">
+                    <div className="p-3 bg-rose-600 text-white rounded-2xl shadow-lg animate-pulse hidden md:block">
+                        <Siren size={24} />
+                    </div>
+                    <div className="flex-1">
+                        <h3 className="text-rose-800 font-black uppercase text-xs tracking-widest flex items-center gap-2">
+                            <AlertTriangle size={14} className="md:hidden" />
+                            Avisos Críticos de Logística ({lowStockItems.length})
+                        </h3>
+                        <p className="text-rose-600/80 text-xs font-bold mt-1">El stock de los siguientes productos ha caído por debajo del mínimo de seguridad establecido. Se requiere reposición urgente en almacén.</p>
+                        <div className="flex flex-wrap gap-2 mt-3">
+                            {lowStockItems.map(item => (
+                                <span key={item.id} className="bg-white text-rose-700 font-black text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-xl border border-rose-200 shadow-sm flex items-center gap-1">
+                                    <Package size={12} /> {item.name}: {item.quantity}{item.unit}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* 2. PENDING APPROVALS (TOP PRIORITY FOR ADMIN) */}
             {isAdmin && pendingApprovals.length > 0 && (
