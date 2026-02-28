@@ -5,6 +5,45 @@ import { db, doc, onSnapshot, setDoc } from '../services/firebase';
 
 const FIREBASE_DOC_PATH = 'falla/merello2026';
 
+// SANITIZADOR MAESTRO: Garantiza que TODOS los campos de data tengan valores seguros.
+// Si Firebase devuelve un JSON parcial (ej: sin barSessions o sin incidents),
+// esta función los rellena con arrays vacíos para evitar crashes de UI.
+const sanitizeData = (raw: any): AppData => {
+  return {
+    ...DEFAULT_DATA,
+    ...raw,
+    // Asegurar que todos los arrays críticos existan
+    members: raw?.members ?? [],
+    transactions: raw?.transactions ?? [],
+    tasks: raw?.tasks ?? [],
+    shoppingList: raw?.shoppingList ?? [],
+    orders: raw?.orders ?? [],
+    shifts: raw?.shifts ?? [],
+    suppliers: raw?.suppliers ?? [],
+    budgetLines: raw?.budgetLines ?? [],
+    mealEvents: raw?.mealEvents ?? [],
+    incidents: raw?.incidents ?? [],
+    stock: raw?.stock ?? [],
+    barSessions: raw?.barSessions ?? [],
+    catalog: raw?.catalog ?? [],
+    workGroups: raw?.workGroups ?? [],
+    auditLog: raw?.auditLog ?? [],
+    budgetLimit: raw?.budgetLimit ?? DEFAULT_DATA.budgetLimit,
+    // Asegurar objetos complejos
+    appConfig: {
+      ...DEFAULT_DATA.appConfig,
+      ...(raw?.appConfig ?? {}),
+      pins: { ...DEFAULT_DATA.appConfig.pins, ...(raw?.appConfig?.pins ?? {}) },
+      barPrices: raw?.appConfig?.barPrices ?? DEFAULT_DATA.appConfig.barPrices,
+      shiftLabels: raw?.appConfig?.shiftLabels ?? DEFAULT_DATA.appConfig.shiftLabels,
+      stockCategories: raw?.appConfig?.stockCategories ?? DEFAULT_DATA.appConfig.stockCategories,
+      stockCategoryDefs: raw?.appConfig?.stockCategoryDefs ?? DEFAULT_DATA.appConfig.stockCategoryDefs,
+    },
+    kioskConfig: raw?.kioskConfig ?? DEFAULT_DATA.kioskConfig,
+    kioskStatus: raw?.kioskStatus ?? DEFAULT_DATA.kioskStatus,
+  };
+};
+
 export const useAppData = () => {
   // 1. Inicialización Lazy del Estado
   const [data, setData] = useState<AppData>(() => {
@@ -44,7 +83,7 @@ export const useAppData = () => {
             }
           }
         }
-        return parsed;
+        return sanitizeData(parsed);
       }
       return DEFAULT_DATA;
     } catch (e) {
@@ -67,14 +106,17 @@ export const useAppData = () => {
     // Escucha en tiempo real de Firebase
     const unsub = onSnapshot(doc(db, FIREBASE_DOC_PATH), (docSnap) => {
       if (docSnap.exists()) {
-        const remoteData = docSnap.data() as AppData;
+        const remoteData = docSnap.data();
+
+        // Sanitizar datos remotos para rellenar campos faltantes
+        const safeData = sanitizeData(remoteData);
 
         // Mantener las comprobaciones de migración seguras
-        if (remoteData.appConfig && (!remoteData.appConfig.stockCategoryDefs || remoteData.appConfig.stockCategoryDefs.length === 0)) {
-          remoteData.appConfig.stockCategoryDefs = [...DEFAULT_DATA.appConfig.stockCategoryDefs!];
+        if (safeData.appConfig && (!safeData.appConfig.stockCategoryDefs || safeData.appConfig.stockCategoryDefs.length === 0)) {
+          safeData.appConfig.stockCategoryDefs = [...DEFAULT_DATA.appConfig.stockCategoryDefs!];
         }
 
-        setData(remoteData);
+        setData(safeData);
       }
     }, (error) => {
       console.error("Error en Firebase onSnapshot:", error);
