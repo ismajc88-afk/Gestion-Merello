@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, useRef, useCallback, startTransition } from 'react';
-import OneSignal from 'react-onesignal';
+// OneSignal eliminado: se usaba un appId inválido y ntfy SSE es el sistema principal
 import { joinRoom } from 'trystero';
 import { useAppData } from './hooks/useAppData';
 import { useToast } from './hooks/useToast';
@@ -71,20 +71,19 @@ const App: React.FC = () => {
     const [networkStatus, setNetworkStatus] = useState<'ONLINE' | 'OFFLINE' | 'CONNECTING'>('CONNECTING');
     const [peerCount, setPeerCount] = useState(0);
 
-    // Refs para lógica de Polling y Audio (ESTABILIDAD)
+    // Refs para lógica de SSE y Audio (ESTABILIDAD)
     const configRef = useRef(data.appConfig);
-    const lastPollTimeRef = useRef<number>(0);
     const processedMsgIds = useRef<Set<string>>(new Set());
     const audioContextRef = useRef<AudioContext | null>(null);
     const silentAudioRef = useRef<HTMLAudioElement | null>(null);
     const initRef = useRef(false);
+    const sseRef = useRef<EventSource | null>(null);
 
     // Canales Secundarios
     const [sendP2P, setSendP2P] = useState<any>(null);
     const [localChannel, setLocalChannel] = useState<BroadcastChannel | null>(null);
 
     // --- CONSTANTES ---
-    const ONE_SIGNAL_APP_ID = "bbb260df-3c34-48c9-a515-3f84c4c7fe38";
     const SILENT_MP3 = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//oeAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAw//oeAAAAAAAAAAAAAAAAAAAAAAAATGF2YzU4LjU0AAAAAAAAAAAAAAAAAAAAAAAAAAAACCAAAAAAAAAAASAAAAAAAAD/++WEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//oeQAA=";
 
     useEffect(() => {
@@ -144,44 +143,67 @@ const App: React.FC = () => {
         setAlertState({ active: true, title, msg, source });
     }, [playBeep]);
 
-    const handleAudioHeartbeat = useCallback(async () => {
-        const now = Date.now();
+    // --- SSE: Conexión permanente con ntfy.sh (reemplaza el polling de 2s) ---
+    useEffect(() => {
         const topic = configRef.current.ntfyTopic || "merello-planner-2026-global-alerts";
-        if (now - lastPollTimeRef.current > 2000) {
-            lastPollTimeRef.current = now;
+        let reconnectTimeout: ReturnType<typeof setTimeout>;
+
+        const connect = () => {
+            // Cerrar conexión anterior si existe
+            if (sseRef.current) {
+                sseRef.current.close();
+            }
+
             try {
-                const response = await fetch(`https://ntfy.sh/${topic}/json?since=all&limit=5`, { cache: 'no-store', method: 'GET' });
-                if (response.ok) {
+                const es = new EventSource(`https://ntfy.sh/${topic}/sse`);
+                sseRef.current = es;
+
+                es.onopen = () => {
                     setNetworkStatus('ONLINE');
-                    const text = await response.text();
-                    const lines = text.trim().split('\n');
-                    lines.forEach(line => {
-                        if (!line) return;
-                        try {
-                            const msg = JSON.parse(line);
-                            if (msg.event === 'message') {
-                                const msgTime = msg.time * 1000;
-                                const isRecent = (Date.now() - msgTime) < 300000;
-                                if (!processedMsgIds.current.has(msg.id) && isRecent) {
-                                    processedMsgIds.current.add(msg.id);
-                                    triggerGlobalAlert(msg.title || 'ALERTA', msg.message, 'RED MÓVIL');
+                    console.log('[Ntfy SSE] Conectado al canal:', topic);
+                };
+
+                es.onmessage = (event) => {
+                    try {
+                        const msg = JSON.parse(event.data);
+                        if (msg.event === 'message' && msg.id) {
+                            // Evitar duplicados
+                            if (!processedMsgIds.current.has(msg.id)) {
+                                processedMsgIds.current.add(msg.id);
+                                // Limitar memoria: máximo 200 IDs almacenados
+                                if (processedMsgIds.current.size > 200) {
+                                    const firstId = processedMsgIds.current.values().next().value;
+                                    if (firstId) processedMsgIds.current.delete(firstId);
                                 }
+                                triggerGlobalAlert(msg.title || 'ALERTA', msg.message || '', 'NTFY SSE');
                             }
-                        } catch (e) { }
-                    });
-                } else {
-                    if (response.status !== 404) setNetworkStatus('OFFLINE');
-                }
+                        }
+                    } catch (e) { /* Ignorar mensajes malformados */ }
+                };
+
+                es.onerror = () => {
+                    setNetworkStatus('OFFLINE');
+                    es.close();
+                    sseRef.current = null;
+                    // Reconectar en 10 segundos
+                    reconnectTimeout = setTimeout(connect, 10000);
+                };
             } catch (e) {
                 setNetworkStatus('OFFLINE');
+                reconnectTimeout = setTimeout(connect, 10000);
             }
-        }
-    }, [triggerGlobalAlert]);
+        };
 
-    useEffect(() => {
-        const interval = setInterval(handleAudioHeartbeat, 2000);
-        return () => clearInterval(interval);
-    }, [handleAudioHeartbeat]);
+        connect();
+
+        return () => {
+            clearTimeout(reconnectTimeout);
+            if (sseRef.current) {
+                sseRef.current.close();
+                sseRef.current = null;
+            }
+        };
+    }, [triggerGlobalAlert]);
 
     const activateAudio = () => {
         if (silentAudioRef.current) {
@@ -212,9 +234,6 @@ const App: React.FC = () => {
             const channel = new BroadcastChannel('merello_alerts');
             channel.onmessage = (event) => triggerGlobalAlert(event.data.title, event.data.msg, 'LOCAL TAB');
             setLocalChannel(channel);
-        } catch (e) { }
-        try {
-            OneSignal.init({ appId: ONE_SIGNAL_APP_ID, allowLocalhostAsSecureOrigin: true }).catch(() => { });
         } catch (e) { }
     }, [triggerGlobalAlert]);
 
