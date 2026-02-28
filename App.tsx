@@ -150,7 +150,7 @@ const App: React.FC = () => {
         if (now - lastPollTimeRef.current > 2000) {
             lastPollTimeRef.current = now;
             try {
-                const response = await fetch(`https://ntfy.tuxnet.es/${topic}/json?since=all&limit=5`, { cache: 'no-store', method: 'GET' });
+                const response = await fetch(`https://ntfy.sh/${topic}/json?since=all&limit=5`, { cache: 'no-store', method: 'GET' });
                 if (response.ok) {
                     setNetworkStatus('ONLINE');
                     const text = await response.text();
@@ -223,7 +223,7 @@ const App: React.FC = () => {
         setPushStatus({ status: 'SENDING', msg: 'Contactando App Externa...' });
         // 🚀 FIRE AND FORGET: No usamos 'await' para NO bloquear las notificaciones locales.
         // Enviamos el JSON en texto plano para burlar el OPTIONS Preflight (CORS) de los navegadores móviles.
-        fetch('https://ntfy.tuxnet.es/', {
+        fetch('https://ntfy.sh/', {
             method: 'POST',
             body: JSON.stringify({
                 topic: topic,

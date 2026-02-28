@@ -272,7 +272,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         {/* BOTÓN SUSCRIPCIÓN NTFY (SERVIDOR ROBUSTO TUXNET) */}
         <div className="w-full max-w-sm mx-auto flex flex-col items-center">
           <a
-            href={`ntfy://ntfy.tuxnet.es/${config.ntfyTopic || 'merello-planner-2026-global-alerts'}?display=Merello+Planner`}
+            href={`ntfy://ntfy.sh/${config.ntfyTopic || 'merello-planner-2026-global-alerts'}?display=Merello+Planner`}
             className="bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 text-emerald-400 py-3 px-6 rounded-2xl flex items-center justify-center gap-3 transition-colors shadow-lg active:scale-95 w-full group"
           >
             <BellRing size={20} className="group-hover:animate-wiggle" />
@@ -284,7 +284,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
           <div className="text-[10px] text-zinc-500 mt-3 text-center px-4 max-w-xs leading-relaxed font-bold bg-zinc-900/50 p-3 rounded-xl border border-zinc-800">
             <p className="text-white mb-1">¿Tienes iOS o da error?</p>
-            <p>Abre Ntfy, cambia el Servidor por Defecto a <span className="text-emerald-400 font-mono tracking-wider break-all bg-emerald-900/30 px-1 rounded">https://ntfy.tuxnet.es</span></p>
+            <p>Abre Ntfy, cambia el Servidor por Defecto a <span className="text-emerald-400 font-mono tracking-wider break-all bg-emerald-900/30 px-1 rounded">https://ntfy.sh</span></p>
             <p className="mt-1">Y suscríbete al canal: <span className="text-emerald-400 font-mono tracking-wider break-all bg-emerald-900/30 px-1 rounded">{config.ntfyTopic || 'merello-planner-2026-global-alerts'}</span></p>
           </div>
         </div>
