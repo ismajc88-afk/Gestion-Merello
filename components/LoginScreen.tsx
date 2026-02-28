@@ -269,23 +269,38 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           ))}
         </div>
 
-        {/* BOTÓN SUSCRIPCIÓN NTFY (SERVIDOR ROBUSTO TUXNET) */}
-        <div className="w-full max-w-sm mx-auto flex flex-col items-center">
+        {/* BOTÓN SUSCRIPCIÓN NTFY (SERVIDOR OFICIAL) */}
+        <div className="w-full max-w-sm mx-auto flex flex-col items-center gap-3">
+          {/* Botón principal: abre Ntfy directo con la suscripción */}
           <a
             href={`ntfy://ntfy.sh/${config.ntfyTopic || 'merello-planner-2026-global-alerts'}?display=Merello+Planner`}
-            className="bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 text-emerald-400 py-3 px-6 rounded-2xl flex items-center justify-center gap-3 transition-colors shadow-lg active:scale-95 w-full group"
+            className="bg-gradient-to-r from-emerald-600 to-teal-600 border-2 border-emerald-400/30 text-white py-4 px-6 rounded-3xl flex items-center justify-center gap-4 transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)] active:scale-95 w-full group"
           >
-            <BellRing size={20} className="group-hover:animate-wiggle" />
-            <div className="text-left leading-tight">
-              <span className="block text-xs font-black uppercase tracking-widest text-zinc-100">Suscribirse a Alertas</span>
-              <span className="block text-[9px] font-bold text-emerald-500/80">Servidor Anti-Bloqueos (tuxnet.es)</span>
+            <div className="bg-white/20 p-2.5 rounded-xl group-hover:scale-110 transition-transform">
+              <BellRing size={24} className="animate-wiggle" />
+            </div>
+            <div className="text-left leading-tight flex-1">
+              <span className="block text-sm font-black uppercase tracking-wider">🔔 Activar Alertas</span>
+              <span className="block text-[10px] font-bold text-emerald-200/80 mt-0.5">Toca y se configura solo • ntfy.sh</span>
             </div>
           </a>
 
-          <div className="text-[10px] text-zinc-500 mt-3 text-center px-4 max-w-xs leading-relaxed font-bold bg-zinc-900/50 p-3 rounded-xl border border-zinc-800">
-            <p className="text-white mb-1">¿Tienes iOS o da error?</p>
-            <p>Abre Ntfy, cambia el Servidor por Defecto a <span className="text-emerald-400 font-mono tracking-wider break-all bg-emerald-900/30 px-1 rounded">https://ntfy.sh</span></p>
-            <p className="mt-1">Y suscríbete al canal: <span className="text-emerald-400 font-mono tracking-wider break-all bg-emerald-900/30 px-1 rounded">{config.ntfyTopic || 'merello-planner-2026-global-alerts'}</span></p>
+          {/* Fallback: enlace web directo para quien no tenga la app */}
+          <a
+            href={`https://ntfy.sh/${config.ntfyTopic || 'merello-planner-2026-global-alerts'}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 text-zinc-300 py-2.5 px-5 rounded-2xl flex items-center justify-center gap-3 transition-colors active:scale-95 w-full text-xs"
+          >
+            <span className="font-bold">¿No tienes la app? Ábrelo en el navegador →</span>
+          </a>
+
+          {/* Info compacta para iOS */}
+          <div className="text-[10px] text-zinc-500 text-center px-4 max-w-xs leading-relaxed font-bold bg-zinc-900/50 p-3 rounded-xl border border-zinc-800">
+            <p className="text-white mb-1">📱 Si no se abre automáticamente:</p>
+            <p>1. Instala <span className="text-emerald-400">Ntfy</span> desde App Store / Play Store</p>
+            <p className="mt-1">2. Vuelve aquí y toca el botón verde</p>
+            <p className="mt-1 text-zinc-600">Canal: <span className="text-emerald-400 font-mono tracking-wider break-all bg-emerald-900/30 px-1 rounded">{config.ntfyTopic || 'merello-planner-2026-global-alerts'}</span></p>
           </div>
         </div>
 
