@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, startTransition } from 'react';
 import OneSignal from 'react-onesignal';
 import { joinRoom } from 'trystero';
 import { useAppData } from './hooks/useAppData';
@@ -38,6 +38,15 @@ const App: React.FC = () => {
         isAiOpen, setIsAiOpen,
         actions
     } = useAppData();
+
+    // Wrappers con startTransition para evitar crash de React.lazy al cambiar de vista
+    const safeSetUserRole = useCallback((role: typeof userRole) => {
+        startTransition(() => setUserRole(role));
+    }, [setUserRole]);
+
+    const safeSetCurrentView = useCallback((view: string) => {
+        startTransition(() => setCurrentView(view));
+    }, [setCurrentView]);
     const toast = useToast();
 
     // --- HELPER: LOG DE AUDITORÍA ---
@@ -259,7 +268,7 @@ const App: React.FC = () => {
     if (!userRole) {
         return (
             <>
-                <LoginScreen config={data.appConfig} onLogin={setUserRole} onInitAudio={initPermissions} hasPushSupport={true} isSubscribed={Notification.permission === 'granted'} onToggleNotifications={initPermissions} />
+                <LoginScreen config={data.appConfig} onLogin={safeSetUserRole} onInitAudio={initPermissions} hasPushSupport={true} isSubscribed={Notification.permission === 'granted'} onToggleNotifications={initPermissions} />
                 <audio ref={silentAudioRef} src={SILENT_MP3} loop muted style={{ display: 'none' }} />
             </>
         );
@@ -277,7 +286,7 @@ const App: React.FC = () => {
                 config={data.kioskConfig}
                 prices={data.appConfig.barPrices}
                 appConfig={data.appConfig}
-                onExit={() => setUserRole(null)}
+                onExit={() => safeSetUserRole(null)}
                 totalSessionRevenue={data.barSessions?.find(s => !s.isClosed)?.revenue || 0}
                 ticketCounts={getActiveSessionCounts()}
                 onCreateIncident={(t, p, sId, q, term) => { updateData({ incidents: [...data.incidents, { id: Date.now().toString(), title: t, priority: p, status: 'OPEN', timestamp: new Date().toISOString(), stockItemId: sId, quantity: q, terminal: term }] }); sendPushAlert(p === 'URGENT' ? `🚨 URGENCIA: CAJA DE TICKETS` : `🛠️ PEDIDO: CAJA DE TICKETS`, `${t}`); }}
@@ -326,7 +335,7 @@ const App: React.FC = () => {
                 config={data.kioskConfig}
                 prices={data.appConfig.barPrices}
                 appConfig={data.appConfig}
-                onExit={() => setUserRole(null)}
+                onExit={() => safeSetUserRole(null)}
                 onCreateIncident={(t, p, sId, q, term) => {
                     const isApproval = t.includes('🔓 APROBACIÓN REQUERIDA');
                     updateData({
@@ -391,7 +400,7 @@ const App: React.FC = () => {
                 config={data.kioskConfig}
                 prices={data.appConfig.barPrices}
                 appConfig={data.appConfig}
-                onExit={() => setUserRole(null)}
+                onExit={() => safeSetUserRole(null)}
                 onCreateIncident={(t, p, sId, q, term) => {
                     const isApproval = t.includes('🔓 APROBACIÓN REQUERIDA');
                     updateData({
@@ -506,7 +515,7 @@ const App: React.FC = () => {
                 config={data.kioskConfig}
                 prices={data.appConfig.barPrices}
                 appConfig={data.appConfig}
-                onExit={() => setCurrentView('dashboard')}
+                onExit={() => safeSetCurrentView('dashboard')}
                 onCreateIncident={(t, p, sId, q, term) => {
                     const isApproval = t.includes('🔓 APROBACIÓN REQUERIDA');
                     updateData({
@@ -589,7 +598,7 @@ const App: React.FC = () => {
     };
 
     return (
-        <Layout currentView={currentView} onChangeView={setCurrentView} onOpenAI={() => setIsAiOpen(true)} userRole={userRole} onLogout={() => setUserRole(null)} peerCount={peerCount} onForceSync={() => { }} appConfig={data.appConfig}>
+        <Layout currentView={currentView} onChangeView={safeSetCurrentView} onOpenAI={() => setIsAiOpen(true)} userRole={userRole} onLogout={() => safeSetUserRole(null)} peerCount={peerCount} onForceSync={() => { }} appConfig={data.appConfig}>
             <GlobalAlertOverlay />
             <audio ref={silentAudioRef} src={SILENT_MP3} loop muted style={{ display: 'none' }} />
             <ErrorBoundary>
