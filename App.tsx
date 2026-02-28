@@ -239,22 +239,33 @@ const App: React.FC = () => {
 
     const sendPushAlert = async (title: string, msg: string) => {
         const topic = configRef.current.ntfyTopic || "merello-planner-2026-global-alerts";
-        setPushStatus({ status: 'SENDING', msg: 'Contactando App Externa...' });
-        // 🚀 FIRE AND FORGET: No usamos 'await' para NO bloquear las notificaciones locales.
-        // Enviamos el JSON en texto plano para burlar el OPTIONS Preflight (CORS) de los navegadores móviles.
-        fetch('https://ntfy.sh/', {
-            method: 'POST',
-            body: JSON.stringify({
-                topic: topic,
-                title: title,
-                message: msg,
-                priority: 5,
-                tags: ['rotating_light', 'vibration']
-            })
-        }).catch(e => console.error("Error silencioso Ntfy", e));
+        const payload = { topic, title, message: msg, priority: 5, tags: ['rotating_light', 'vibration'] };
+        setPushStatus({ status: 'SENDING', msg: 'Enviando alerta...' });
+
+        // 1. Intentar vía proxy de Vercel (bypasses bloqueos de router/firewall)
+        // 2. Si falla, intentar directo a ntfy.sh (para desarrollo local)
+        try {
+            const proxyRes = await fetch('/api/ntfy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (proxyRes.ok) {
+                setPushStatus({ status: 'SUCCESS', msg: '¡ALERTA ENVIADA!' });
+            } else {
+                throw new Error('Proxy failed');
+            }
+        } catch (e) {
+            // Fallback: directo a ntfy.sh (funciona si no hay bloqueo de red)
+            fetch('https://ntfy.sh/', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            }).catch(e2 => console.error("Ntfy directo también falló:", e2));
+            setPushStatus({ status: 'SUCCESS', msg: '¡SEÑAL ENVIADA!' });
+        }
+
         if (sendP2P) sendP2P({ title, msg, timestamp: Date.now() });
         if (localChannel) localChannel.postMessage({ title, msg });
-        setPushStatus({ status: 'SUCCESS', msg: '¡SEÑAL ENVIADA!' });
         setTimeout(() => setPushStatus({ status: 'IDLE', msg: '' }), 2000);
     };
 
