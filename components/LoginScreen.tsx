@@ -273,7 +273,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         <div className="w-full max-w-sm mx-auto flex flex-col items-center gap-3">
           {/* Botón principal: abre Ntfy directo con la suscripción */}
           <a
-            href={`ntfy://ntfy.sh/${config.ntfyTopic || 'merello-planner-2026-global-alerts'}?display=Merello+Planner`}
+            href={`ntfy://ntfy.sh/${config.ntfyTopic || 'merello-planner-2026-global-alerts'}`}
             className="bg-gradient-to-r from-emerald-600 to-teal-600 border-2 border-emerald-400/30 text-white py-4 px-6 rounded-3xl flex items-center justify-center gap-4 transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)] active:scale-95 w-full group"
           >
             <div className="bg-white/20 p-2.5 rounded-xl group-hover:scale-110 transition-transform">
@@ -308,7 +308,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
       {/* VERSION INDICATOR */}
       <div className="mt-4 text-[9px] font-mono text-slate-600 uppercase tracking-widest opacity-50 shrink-0">
-        v3.0.1 (STOCK ONLY FIX)
+        v3.2.1 (NTFY FIX)
       </div>
 
       <style>{`
