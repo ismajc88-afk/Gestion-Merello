@@ -257,70 +257,53 @@ export const KioskMode: React.FC<KioskModeProps> = ({
     }
 
     // ----------------------------------------------------------------------
-    // RENDER: LOGISTICS MODE - KANBAN BOARD
+    // RENDER: LOGISTICS MODE - KANBAN SIMPLIFICADO (2 COLUMNAS)
     // ----------------------------------------------------------------------
     if (mode === 'LOGISTICS') {
-        const pendingRequests = incidents.filter(inc => (inc.status === 'OPEN' || inc.status === 'PENDING_DELIVERY' || inc.status === 'PENDING_APPROVAL') && inc.stockItemId);
-        const deliveredRequests = incidents.filter(inc => inc.status === 'DELIVERED' && inc.stockItemId);
+        // Pendientes = todo lo que NO está RESOLVED (incluye DELIVERED antiguos)
+        const pendingRequests = incidents.filter(inc => (inc.status === 'OPEN' || inc.status === 'PENDING_DELIVERY' || inc.status === 'PENDING_APPROVAL' || inc.status === 'DELIVERED') && inc.stockItemId);
         const completedToday = incidents.filter(inc => inc.status === 'RESOLVED' && inc.stockItemId && inc.timestamp.startsWith(new Date().toISOString().split('T')[0]));
 
-        const handleMarkAsDelivered = (incidentId: string) => {
-            if (confirm('¿Confirmar que has entregado este pedido?')) {
-                onMarkAsDelivered?.(incidentId);
-                toast.success('Pedido marcado como entregado');
+        const handleResolve = (incidentId: string) => {
+            if (confirm('¿Enviado/entregado este pedido?')) {
+                onConfirmReceipt?.(incidentId);
+                toast.success('✅ Pedido completado');
             }
         };
 
-        const renderKanbanCard = (request: typeof incidents[0], isDelivered: boolean = false, isCompleted: boolean = false) => {
+        const renderCard = (request: typeof incidents[0], done: boolean) => {
             const stockItem = stock.find(s => s.id === request.stockItemId);
             if (!stockItem) return null;
             const isUrgent = request.priority === 'URGENT';
-            const isSpecialAuth = request.title.includes('🔓 APROBACIÓN REQUERIDA');
 
             return (
-                <div key={request.id} className={`rounded-2xl p-4 border-2 shadow-sm relative transition-all hover:scale-[1.02] ${isUrgent ? 'bg-red-500/10 border-red-500/30 shadow-red-500/10' : isSpecialAuth ? 'bg-orange-500/10 border-orange-500/30' : isDelivered ? 'bg-blue-500/10 border-blue-500/20 opacity-90' : isCompleted ? 'bg-emerald-500/5 border-emerald-500/20 opacity-70' : 'bg-slate-800/50 border-slate-700 hover:border-slate-600'}`}>
-                    <div className="flex justify-between items-start mb-3">
-                        <div className="flex flex-wrap gap-1.5 mb-1">
-                            {isUrgent && <span className="px-2 py-0.5 bg-red-500 text-white text-[9px] font-black uppercase rounded-full animate-pulse shadow-lg shadow-red-500/20">🚨 Urgente</span>}
-                            {isSpecialAuth && <span className="px-2 py-0.5 bg-orange-500 text-white text-[9px] font-black uppercase rounded-full">🔓 Aut.</span>}
+                <div key={request.id} className={`rounded-2xl p-4 border-2 shadow-sm transition-all ${isUrgent && !done ? 'bg-red-500/10 border-red-500/30 animate-pulse' : done ? 'bg-emerald-500/5 border-emerald-500/20 opacity-70' : 'bg-slate-800/50 border-slate-700'}`}>
+                    <div className="flex justify-between items-start mb-2">
+                        <div className="flex flex-wrap gap-1.5">
+                            {isUrgent && <span className="px-2 py-0.5 bg-red-500 text-white text-[9px] font-black uppercase rounded-full">🚨 Urgente</span>}
                             <span className="px-2 py-0.5 bg-slate-950 text-slate-300 text-[9px] font-black uppercase rounded-full border border-slate-700">{request.terminal || 'Barra'}</span>
                         </div>
-                        <span className="text-[10px] text-slate-400 font-bold bg-slate-950/50 px-2 py-1 rounded-lg">
-                            {new Date(isDelivered ? (request.deliveredAt || request.timestamp) : isCompleted ? (request.confirmedAt || request.timestamp) : request.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
+                        <span className="text-[10px] text-slate-400 font-bold">{new Date(request.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
-
-                    <h3 className={`font-black uppercase leading-tight mb-4 ${isCompleted ? 'text-emerald-500/60 line-through' : 'text-white'} ${isCompleted ? 'text-sm' : 'text-lg'}`}>
-                        {stockItem.name}
-                    </h3>
-
-                    <div className="flex justify-between items-end mb-4 bg-slate-950/50 rounded-xl p-3 border border-white/5">
-                        <div className="flex-1">
-                            <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1">A entregar</p>
-                            <div className="flex items-baseline gap-1">
-                                <span className="text-3xl font-black text-white leading-none">{request.quantity || 1}</span>
-                                <span className="text-xs font-bold text-slate-500 uppercase">{stockItem.unit}</span>
-                            </div>
+                    <h3 className={`font-black uppercase leading-tight mb-3 ${done ? 'text-emerald-500/60 line-through text-sm' : 'text-white text-lg'}`}>{stockItem.name}</h3>
+                    <div className="flex justify-between items-end mb-3 bg-slate-950/50 rounded-xl p-3 border border-white/5">
+                        <div>
+                            <p className="text-[9px] font-black text-indigo-400 uppercase mb-1">Cantidad</p>
+                            <span className="text-2xl font-black text-white">{request.quantity || 1}</span>
+                            <span className="text-xs font-bold text-slate-500 ml-1">{stockItem.unit}</span>
                         </div>
-                        <div className="text-right border-l border-white/10 pl-3">
-                            <p className="text-[9px] font-bold text-slate-500 uppercase">Stock: <span className={`font-black ${stockItem.quantity <= stockItem.minStock ? 'text-amber-400' : 'text-slate-300'}`}>{stockItem.quantity}</span></p>
-                            <p className="text-[9px] font-bold text-slate-500 uppercase mt-1">Ubic: <span className="text-slate-300">{stockItem.location}</span></p>
+                        <div className="text-right text-[9px] font-bold text-slate-500">
+                            <p>Ubic: <span className="text-slate-300">{stockItem.location}</span></p>
                         </div>
                     </div>
-
-                    {!isDelivered && !isCompleted && (
-                        <button onClick={() => handleMarkAsDelivered(request.id)} className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl font-black uppercase text-xs flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-indigo-500/25">
-                            <Check size={18} /> Marcar Entregado
+                    {!done && (
+                        <button onClick={() => handleResolve(request.id)} className="w-full py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white rounded-xl font-black uppercase text-xs flex items-center justify-center gap-2 active:scale-95 shadow-lg shadow-emerald-500/25">
+                            <Check size={18} /> Enviado ✅
                         </button>
                     )}
-                    {isDelivered && !isCompleted && (
-                        <div className="w-full py-2.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-xl font-black uppercase text-[10px] text-center flex items-center justify-center gap-2">
-                            <RotateCcw size={14} className="animate-spin-slow" /> Esperando conf. barra
-                        </div>
-                    )}
-                    {isCompleted && (
-                        <div className="w-full py-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500/70 rounded-xl font-black uppercase text-[10px] text-center flex items-center justify-center gap-2">
-                            <Check size={14} /> Confirmado {request.confirmedBy || request.terminal}
+                    {done && (
+                        <div className="w-full py-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500/70 rounded-xl font-black uppercase text-[10px] text-center flex items-center justify-center gap-2">
+                            <Check size={14} /> Hecho
                         </div>
                     )}
                 </div>
@@ -329,87 +312,55 @@ export const KioskMode: React.FC<KioskModeProps> = ({
 
         return (
             <div className="fixed inset-0 bg-gradient-to-br from-slate-950 via-[#0a0f1d] to-slate-950 text-white z-[500] flex flex-col h-[100dvh]">
-                <div className="relative p-4 md:p-5 bg-slate-900/80 backdrop-blur-xl border-b border-white/5 flex justify-between items-center shrink-0 z-10 shadow-2xl safe-pt">
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 via-indigo-500/5 to-purple-600/10 pointer-events-none"></div>
+                <div className="relative p-4 bg-slate-900/80 backdrop-blur-xl border-b border-white/5 flex justify-between items-center shrink-0 z-10 shadow-2xl safe-pt">
                     <div className="relative flex items-center gap-4">
-                        <button onClick={onExit} className="p-3.5 bg-white/5 rounded-2xl hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 transition-all active:scale-95 border border-white/5"><LogOut size={22} /></button>
+                        <button onClick={onExit} className="p-3.5 bg-white/5 rounded-2xl hover:bg-rose-500/20 text-rose-400 transition-all active:scale-95 border border-white/5"><LogOut size={22} /></button>
                         <div>
-                            <h2 className="font-black text-2xl md:text-3xl uppercase italic tracking-tighter bg-gradient-to-r from-white via-indigo-200 to-white bg-clip-text text-transparent drop-shadow-lg">
-                                📦 LOGÍSTICA
-                            </h2>
-                            <p className="text-[10px] md:text-xs text-indigo-400/80 font-bold uppercase tracking-[0.2em] mt-0.5 flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse"></span> Panel Kanban
-                            </p>
+                            <h2 className="font-black text-2xl uppercase italic tracking-tighter bg-gradient-to-r from-white via-indigo-200 to-white bg-clip-text text-transparent">📦 LOGÍSTICA</h2>
+                            <p className="text-[10px] text-indigo-400/80 font-bold uppercase tracking-[0.2em] mt-0.5">Toca "Enviado" cuando entregues</p>
                         </div>
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-x-auto overflow-y-hidden p-4 md:p-6 relative">
-                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-500/5 rounded-full blur-[120px] pointer-events-none"></div>
-                    <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-[150px] pointer-events-none"></div>
-
-                    <div className="relative flex gap-5 md:gap-8 h-full min-w-max md:min-w-0 md:grid md:grid-cols-3">
-
-                        {/* COLUMNA PENDIENTES */}
+                <div className="flex-1 overflow-y-hidden p-4 md:p-6">
+                    <div className="flex gap-5 h-full md:grid md:grid-cols-2">
+                        {/* PENDIENTES */}
                         <div className="w-[320px] md:w-auto h-full flex flex-col bg-slate-900/40 backdrop-blur-md rounded-[32px] border border-white/5 overflow-hidden shadow-2xl">
-                            <div className="p-5 border-b border-white/5 bg-slate-800/50 flex justify-between items-center relative overflow-hidden">
-                                <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent"></div>
-                                <h3 className="relative font-black uppercase text-sm text-white flex items-center gap-2">
+                            <div className="p-5 border-b border-white/5 bg-slate-800/50 flex justify-between items-center">
+                                <h3 className="font-black uppercase text-sm text-white flex items-center gap-2">
                                     <div className="p-1.5 bg-amber-500/20 rounded-lg"><AlertTriangle size={16} className="text-amber-400" /></div>
-                                    1. Pendientes
+                                    Pendientes
                                 </h3>
-                                <span className="relative px-3 py-1 bg-amber-500 text-amber-950 font-black text-xs rounded-xl drop-shadow-md">{pendingRequests.length}</span>
+                                <span className="px-3 py-1 bg-amber-500 text-amber-950 font-black text-xs rounded-xl">{pendingRequests.length}</span>
                             </div>
-                            <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                            <div className="flex-1 overflow-y-auto p-4 space-y-4">
                                 {pendingRequests.length === 0 ? (
                                     <div className="h-full flex flex-col items-center justify-center opacity-40 text-center p-6">
-                                        <div className="p-6 bg-white/5 rounded-full mb-4"><Package size={48} className="text-amber-400/50" /></div>
-                                        <p className="text-xs font-black uppercase tracking-wider text-slate-300">Todo al día</p>
+                                        <Package size={48} className="text-amber-400/50 mb-4" />
+                                        <p className="text-xs font-black uppercase text-slate-300">Todo al día 🎉</p>
                                     </div>
-                                ) : pendingRequests.map(req => renderKanbanCard(req, false, false))}
+                                ) : pendingRequests.map(req => renderCard(req, false))}
                             </div>
                         </div>
 
-                        {/* COLUMNA EN CAMINO */}
+                        {/* COMPLETADOS HOY */}
                         <div className="w-[320px] md:w-auto h-full flex flex-col bg-slate-900/40 backdrop-blur-md rounded-[32px] border border-white/5 overflow-hidden shadow-2xl">
-                            <div className="p-5 border-b border-white/5 bg-blue-900/20 flex justify-between items-center relative overflow-hidden">
-                                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-transparent"></div>
-                                <h3 className="relative font-black uppercase text-sm text-white flex items-center gap-2">
-                                    <div className="animate-spin-slow p-1.5 bg-blue-500/20 rounded-lg"><RotateCcw size={16} className="text-blue-400" /></div>
-                                    2. En Camino
-                                </h3>
-                                <span className="relative px-3 py-1 bg-blue-500 text-blue-950 font-black text-xs rounded-xl drop-shadow-md">{deliveredRequests.length}</span>
-                            </div>
-                            <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
-                                {deliveredRequests.length === 0 ? (
-                                    <div className="h-full flex flex-col items-center justify-center opacity-40 text-center p-6">
-                                        <div className="p-6 bg-white/5 rounded-full mb-4"><RotateCcw size={48} className="text-blue-400/50" /></div>
-                                        <p className="text-xs font-black uppercase tracking-wider text-slate-300">Nada en tránsito</p>
-                                    </div>
-                                ) : deliveredRequests.map(req => renderKanbanCard(req, true, false))}
-                            </div>
-                        </div>
-
-                        {/* COLUMNA COMPLETADOS */}
-                        <div className="w-[320px] md:w-auto h-full flex flex-col bg-slate-900/40 backdrop-blur-md rounded-[32px] border border-white/5 overflow-hidden shadow-2xl">
-                            <div className="p-5 border-b border-white/5 bg-emerald-900/10 flex justify-between items-center relative overflow-hidden">
-                                <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-transparent"></div>
-                                <h3 className="relative font-black uppercase text-sm text-white flex items-center gap-2">
+                            <div className="p-5 border-b border-white/5 bg-emerald-900/10 flex justify-between items-center">
+                                <h3 className="font-black uppercase text-sm text-white flex items-center gap-2">
                                     <div className="p-1.5 bg-emerald-500/20 rounded-lg"><Check size={16} className="text-emerald-400" /></div>
-                                    3. Entregados Hoy
+                                    Hecho Hoy
                                 </h3>
-                                <span className="relative px-3 py-1 bg-emerald-500 text-emerald-950 font-black text-xs rounded-xl drop-shadow-md">{completedToday.length}</span>
+                                <span className="px-3 py-1 bg-emerald-500 text-emerald-950 font-black text-xs rounded-xl">{completedToday.length}</span>
                             </div>
-                            <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                            <div className="flex-1 overflow-y-auto p-4 space-y-4">
                                 {completedToday.length === 0 ? (
                                     <div className="h-full flex flex-col items-center justify-center opacity-40 text-center p-6">
-                                        <div className="p-6 bg-white/5 rounded-full mb-4"><Check size={48} className="text-emerald-400/50" /></div>
-                                        <p className="text-xs font-black uppercase tracking-wider text-slate-300">Aún no hay entregas</p>
+                                        <Check size={48} className="text-emerald-400/50 mb-4" />
+                                        <p className="text-xs font-black uppercase text-slate-300">Sin entregas aún</p>
                                     </div>
-                                ) : completedToday.map(req => renderKanbanCard(req, false, true))}
+                                ) : completedToday.map(req => renderCard(req, true))}
                             </div>
                         </div>
-
                     </div>
                 </div>
             </div>
@@ -483,6 +434,39 @@ export const KioskMode: React.FC<KioskModeProps> = ({
                     </div>
                 </div>
             </div>
+
+            {/* PETICIONES ACTIVAS - BANNERS INLINE (sin modal) */}
+            {myRequests.length > 0 && (
+                <div className="px-4 pt-3 space-y-2">
+                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest px-1">📦 Tus peticiones activas ({myRequests.length})</p>
+                    {myRequests.map(req => {
+                        const stockItem = stock.find(s => s.id === req.stockItemId);
+                        if (!stockItem) return null;
+                        const isReady = req.status === 'DELIVERED';
+                        return (
+                            <div key={req.id} className={`flex items-center justify-between p-3 rounded-2xl border ${isReady ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-slate-800/50 border-slate-700/50'}`}>
+                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                    <div className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${isReady ? 'bg-emerald-500/20' : 'bg-blue-500/20'}`}>
+                                        {isReady ? <Check size={18} className="text-emerald-400" /> : <RotateCcw size={18} className="text-blue-400 animate-spin" />}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="font-black text-white text-sm uppercase truncate">{stockItem.name}</p>
+                                        <p className="text-[10px] text-slate-400">{req.quantity} {stockItem.unit} • {isReady ? '✅ Listo para recoger' : '⏳ En proceso'}</p>
+                                    </div>
+                                </div>
+                                {isReady && (
+                                    <button
+                                        onClick={() => { onConfirmReceipt?.(req.id); }}
+                                        className="shrink-0 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase active:scale-95 transition-all shadow-lg shadow-emerald-500/20"
+                                    >
+                                        Ya lo tengo ✅
+                                    </button>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
 
             {/* GRID STOCK PREMIUM */}
             <div className="flex-1 overflow-y-auto p-6 pb-32">
