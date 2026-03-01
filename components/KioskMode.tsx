@@ -435,39 +435,6 @@ export const KioskMode: React.FC<KioskModeProps> = ({
                 </div>
             </div>
 
-            {/* PETICIONES ACTIVAS - BANNERS INLINE (sin modal) */}
-            {myRequests.length > 0 && (
-                <div className="px-4 pt-3 space-y-2">
-                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest px-1">📦 Tus peticiones activas ({myRequests.length})</p>
-                    {myRequests.map(req => {
-                        const stockItem = stock.find(s => s.id === req.stockItemId);
-                        if (!stockItem) return null;
-                        const isReady = req.status === 'DELIVERED';
-                        return (
-                            <div key={req.id} className={`flex items-center justify-between p-3 rounded-2xl border ${isReady ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-slate-800/50 border-slate-700/50'}`}>
-                                <div className="flex items-center gap-3 flex-1 min-w-0">
-                                    <div className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${isReady ? 'bg-emerald-500/20' : 'bg-blue-500/20'}`}>
-                                        {isReady ? <Check size={18} className="text-emerald-400" /> : <RotateCcw size={18} className="text-blue-400 animate-spin" />}
-                                    </div>
-                                    <div className="min-w-0">
-                                        <p className="font-black text-white text-sm uppercase truncate">{stockItem.name}</p>
-                                        <p className="text-[10px] text-slate-400">{req.quantity} {stockItem.unit} • {isReady ? '✅ Listo para recoger' : '⏳ En proceso'}</p>
-                                    </div>
-                                </div>
-                                {isReady && (
-                                    <button
-                                        onClick={() => { onConfirmReceipt?.(req.id); }}
-                                        className="shrink-0 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase active:scale-95 transition-all shadow-lg shadow-emerald-500/20"
-                                    >
-                                        Ya lo tengo ✅
-                                    </button>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
-
             {/* GRID STOCK PREMIUM */}
             <div className="flex-1 overflow-y-auto p-6 pb-32">
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
