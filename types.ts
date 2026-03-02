@@ -226,6 +226,7 @@ export interface StockItem {
   supplier?: string;
   usageType: 'CASAL' | 'VENTA';
   dailyLimit?: number;
+  imageUrl?: string;
 }
 
 export interface SubTask {

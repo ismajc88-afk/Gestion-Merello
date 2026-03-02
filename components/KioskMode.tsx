@@ -489,9 +489,12 @@ export const KioskMode: React.FC<KioskModeProps> = ({
 
                                 {/* Content */}
                                 <div className="relative z-10 p-4 flex flex-col h-[180px]">
-                                    {/* Top row: emoji + badge */}
+                                    {/* Top row: photo/emoji + badge */}
                                     <div className="flex justify-between items-start mb-2">
-                                        <span className="text-3xl drop-shadow-lg group-hover:scale-110 transition-transform">{catEmoji}</span>
+                                        {item.imageUrl ? (
+                                            <img src={item.imageUrl} alt={item.name} className="w-12 h-12 rounded-xl object-cover border-2 border-white/20 shadow-lg group-hover:scale-110 transition-transform" onError={(e) => { const el = e.currentTarget; el.style.display = 'none'; }} />
+                                        ) : null}
+                                        <span className={`text-3xl drop-shadow-lg group-hover:scale-110 transition-transform ${item.imageUrl ? 'hidden' : ''}`}>{catEmoji}</span>
                                         {isLow && (
                                             <span className="px-2 py-0.5 bg-amber-500 text-[9px] font-black uppercase rounded-full text-amber-950 animate-pulse shadow-lg">⚠ Bajo</span>
                                         )}

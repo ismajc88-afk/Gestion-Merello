@@ -551,6 +551,24 @@ export const StockControl: React.FC<Props> = ({
                                     <p className="text-[10px] text-orange-400 ml-2">Unidades permitidas por día. 0 para desactivar.</p>
                                  </div>
                               )}
+
+                              {/* IMAGE URL */}
+                              <div className="md:col-span-2 space-y-2 bg-indigo-50 p-4 rounded-3xl border border-indigo-100">
+                                 <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Edit3 size={12} /> Foto del Producto (URL)</label>
+                                 <input
+                                    type="url"
+                                    placeholder="https://ejemplo.com/foto-producto.jpg"
+                                    value={editingItem.imageUrl || ''}
+                                    onChange={e => setEditingItem({ ...editingItem, imageUrl: e.target.value })}
+                                    className="w-full p-4 bg-white border-2 border-indigo-200 rounded-2xl font-bold text-sm outline-none focus:border-indigo-400 text-indigo-900"
+                                 />
+                                 {editingItem.imageUrl && (
+                                    <div className="mt-2 flex items-center gap-3">
+                                       <img src={editingItem.imageUrl} alt="Preview" className="w-16 h-16 rounded-xl object-cover border-2 border-indigo-200 shadow-sm" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                                       <p className="text-[10px] text-indigo-400">Vista previa — esta foto se verá en el modo kiosko</p>
+                                    </div>
+                                 )}
+                              </div>
                            </div>
                         </div>
                      )}
