@@ -8,6 +8,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { Layout } from './components/Layout';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { db, doc, setDoc } from './services/firebase';
+import { PWABadge } from './components/PWABadge';
 
 const Dashboard = React.lazy(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard })));
 const BarManager = React.lazy(() => import('./components/BarManager').then(m => ({ default: m.BarManager })));
@@ -71,6 +72,7 @@ const App: React.FC = () => {
     // Estado de Red y Background
     const [networkStatus, setNetworkStatus] = useState<'ONLINE' | 'OFFLINE' | 'CONNECTING'>('CONNECTING');
     const [peerCount, setPeerCount] = useState(0);
+    const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
     // Refs para lógica de SSE y Audio (ESTABILIDAD)
     const configRef = useRef(data.appConfig);
@@ -90,6 +92,18 @@ const App: React.FC = () => {
     useEffect(() => {
         configRef.current = data.appConfig;
     }, [data.appConfig]);
+
+    // --- DETECCIÓN OFFLINE REAL (navigator.onLine) ---
+    useEffect(() => {
+        const goOnline = () => setIsOffline(false);
+        const goOffline = () => setIsOffline(true);
+        window.addEventListener('online', goOnline);
+        window.addEventListener('offline', goOffline);
+        return () => {
+            window.removeEventListener('online', goOnline);
+            window.removeEventListener('offline', goOffline);
+        };
+    }, []);
 
     // --- SONIDO DE ALERTA (BEEP) ---
     const playBeep = useCallback(() => {
@@ -620,19 +634,30 @@ const App: React.FC = () => {
     };
 
     return (
-        <Layout currentView={currentView} onChangeView={safeSetCurrentView} onOpenAI={() => setIsAiOpen(true)} userRole={userRole} onLogout={() => safeSetUserRole(null)} peerCount={peerCount} onForceSync={() => { setDoc(doc(db, 'falla/merello2026'), { ...data, lastModified: Date.now() }).then(() => toast.success('Datos sincronizados con Firebase ✅')).catch(() => toast.error('Error al sincronizar')); }} appConfig={data.appConfig}>
-            <GlobalAlertOverlay />
-            <audio ref={silentAudioRef} src={SILENT_MP3} loop muted style={{ display: 'none' }} />
-            <ErrorBoundary>
-                <React.Suspense fallback={<div className="flex h-full items-center justify-center p-8 w-full"><div className="w-12 h-12 rounded-full border-4 border-emerald-500/20 border-t-emerald-500 animate-spin"></div></div>}>
-                    {renderContent()}
+        <>
+            <Layout currentView={currentView} onChangeView={safeSetCurrentView} onOpenAI={() => setIsAiOpen(true)} userRole={userRole} onLogout={() => safeSetUserRole(null)} peerCount={peerCount} onForceSync={() => { setDoc(doc(db, 'falla/merello2026'), { ...data, lastModified: Date.now() }).then(() => toast.success('Datos sincronizados con Firebase ✅')).catch(() => toast.error('Error al sincronizar')); }} appConfig={data.appConfig}>
+                <GlobalAlertOverlay />
+                <audio ref={silentAudioRef} src={SILENT_MP3} loop muted style={{ display: 'none' }} />
+                <ErrorBoundary>
+                    <React.Suspense fallback={<div className="flex h-full items-center justify-center p-8 w-full"><div className="w-12 h-12 rounded-full border-4 border-emerald-500/20 border-t-emerald-500 animate-spin"></div></div>}>
+                        {renderContent()}
+                    </React.Suspense>
+                </ErrorBoundary>
+                <React.Suspense fallback={null}>
+                    <AiAssistant isOpen={isAiOpen} onClose={() => setIsAiOpen(false)} appData={data} />
                 </React.Suspense>
-            </ErrorBoundary>
-            <React.Suspense fallback={null}>
-                <AiAssistant isOpen={isAiOpen} onClose={() => setIsAiOpen(false)} appData={data} />
-            </React.Suspense>
-        </Layout>
+            </Layout>
+            {
+                isOffline && (
+                    <div className="fixed top-0 left-0 right-0 z-[9998] bg-red-600 text-white text-center py-2 px-4 font-bold text-xs uppercase tracking-widest animate-pulse shadow-lg">
+                        ⚠️ SIN CONEXIÓN — Los cambios se guardan en local y se sincronizarán al reconectar
+                    </div>
+                )
+            }
+            <PWABadge />
+        </>
     );
 };
 
 export default App;
+

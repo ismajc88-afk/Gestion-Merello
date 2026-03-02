@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     StockItem, Incident, KioskConfig, BarPrice,
     AppConfig, KioskWorkload, UserRole, Shift
@@ -54,6 +54,17 @@ export const KioskMode: React.FC<KioskModeProps> = ({
     const [workload, setWorkload] = useState<KioskWorkload>('NORMAL');
     const [showRequests, setShowRequests] = useState(false);
     const toast = useToast();
+
+    // --- DEDUP: Evitar peticiones duplicadas (30 segundos) ---
+    const lastRequestRef = useRef<{ itemId: string; timestamp: number } | null>(null);
+    const isDuplicate = (itemId: string) => {
+        const now = Date.now();
+        if (lastRequestRef.current && lastRequestRef.current.itemId === itemId && (now - lastRequestRef.current.timestamp) < 30000) {
+            return true;
+        }
+        lastRequestRef.current = { itemId, timestamp: now };
+        return false;
+    };
 
     // POS State (Solo para Cajeros)
     const [cart, setCart] = useState<{ name: string, price: number, quantity: number }[]>([]);
@@ -120,12 +131,20 @@ export const KioskMode: React.FC<KioskModeProps> = ({
 
     // --- HANDLERS STOCK ---
     const handleIceRequest = () => {
+        if (isDuplicate('ICE_REQUEST')) {
+            toast.warning('Ya has pedido hielo hace menos de 30 segundos');
+            return;
+        }
         onCreateIncident('Necesitamos Hielo Urgente', 'URGENT', undefined, 1, initialMode);
         alert("❄️ AVISO DE HIELO ENVIADO");
     };
 
     const confirmRestock = () => {
         if (!restockItem) return;
+        if (isDuplicate(restockItem.id)) {
+            toast.warning(`Ya pediste ${restockItem.name} hace menos de 30 segundos`);
+            return;
+        }
         onCreateIncident(`Reposición: ${restockItem.name}`, restockUrgency, restockItem.id, restockQty, initialMode);
         setRestockItem(null);
         setJustification('');
