@@ -7,6 +7,7 @@ import { useToast } from './hooks/useToast';
 import { LoginScreen } from './components/LoginScreen';
 import { Layout } from './components/Layout';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { db, doc, setDoc } from './services/firebase';
 
 const Dashboard = React.lazy(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard })));
 const BarManager = React.lazy(() => import('./components/BarManager').then(m => ({ default: m.BarManager })));
@@ -27,8 +28,8 @@ const HelpGuide = React.lazy(() => import('./components/HelpGuide').then(m => ({
 const KioskMode = React.lazy(() => import('./components/KioskMode').then(m => ({ default: m.KioskMode })));
 const AiAssistant = React.lazy(() => import('./components/AiAssistant').then(m => ({ default: m.AiAssistant })));
 const WorkGroupManager = React.lazy(() => import('./components/WorkGroupManager').then(m => ({ default: m.WorkGroupManager })));
-import { Task, KioskWorkload, TransactionType, TicketItem, Incident, AuditLogEntry, AuditActionType, SubBudgetLine } from './types';
-import { Bell, CheckCircle2, Wifi, AlertTriangle, WifiOff, Users, Globe, Siren, RefreshCw, Radio, Volume2, Play, Smartphone, Download, Copy, X, Check, Zap, ExternalLink } from 'lucide-react';
+import { Task, KioskWorkload, TransactionType, Incident, AuditLogEntry, AuditActionType } from './types';
+import { Siren } from 'lucide-react';
 
 const App: React.FC = () => {
     const {
@@ -257,11 +258,20 @@ const App: React.FC = () => {
             }
         } catch (e) {
             // Fallback: directo a ntfy.sh (funciona si no hay bloqueo de red)
-            fetch('https://ntfy.sh/', {
-                method: 'POST',
-                body: JSON.stringify(payload)
-            }).catch(e2 => console.error("Ntfy directo también falló:", e2));
-            setPushStatus({ status: 'SUCCESS', msg: '¡SEÑAL ENVIADA!' });
+            try {
+                const directRes = await fetch('https://ntfy.sh/', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                if (directRes.ok) {
+                    setPushStatus({ status: 'SUCCESS', msg: '¡SEÑAL ENVIADA (directo)!' });
+                } else {
+                    setPushStatus({ status: 'ERROR', msg: 'Error: ntfy no respondió' });
+                }
+            } catch (e2) {
+                console.error('Ntfy directo también falló:', e2);
+                setPushStatus({ status: 'ERROR', msg: 'Sin conexión a ntfy' });
+            }
         }
 
         if (sendP2P) sendP2P({ title, msg, timestamp: Date.now() });
@@ -387,11 +397,7 @@ const App: React.FC = () => {
                 onResolveIncident={(id, status) => updateData({ incidents: data.incidents.map(i => i.id === id ? { ...i, status: (status as Incident['status']) || 'RESOLVED' } : i) })}
                 onUpdateStock={(id, q) => updateData({ stock: data.stock.map(i => i.id === id ? { ...i, quantity: q } : i) })}
                 onUpdateWorkload={handleKioskWorkloadUpdate}
-                onMarkAsDelivered={(id) => {
-                    updateData({ incidents: data.incidents.map(i => i.id === id ? { ...i, status: 'DELIVERED', deliveredAt: new Date().toISOString(), deliveredBy: userRole } : i) });
-                    const incident = data.incidents.find(i => i.id === id);
-                    if (incident) sendPushAlert('🚚 PEDIDO EN CAMINO', `Logística ha enviado tu petición de ${incident.title.replace('🔓 APROBACIÓN REQUERIDA: ', '')} al ${incident.terminal || 'Barra'}`);
-                }}
+
                 onConfirmReceipt={(id) => {
                     const incident = data.incidents.find(i => i.id === id);
                     if (incident && incident.stockItemId && incident.quantity) {
@@ -452,14 +458,6 @@ const App: React.FC = () => {
                 onResolveIncident={(id, status) => updateData({ incidents: data.incidents.map(i => i.id === id ? { ...i, status: (status as Incident['status']) || 'RESOLVED' } : i) })}
                 onUpdateStock={(id, q) => updateData({ stock: data.stock.map(i => i.id === id ? { ...i, quantity: q } : i) })}
                 onUpdateWorkload={handleKioskWorkloadUpdate}
-                onMarkAsDelivered={(id) => {
-                    updateData({ incidents: data.incidents.map(i => i.id === id ? { ...i, status: 'DELIVERED', deliveredAt: new Date().toISOString(), deliveredBy: userRole } : i) });
-                    const incident = data.incidents.find(i => i.id === id);
-                    if (incident) {
-                        sendPushAlert('🚚 PEDIDO EN CAMINO', `Logística ha enviado tu petición de ${incident.title.replace('🔓 APROBACIÓN REQUERIDA: ', '')} al ${incident.terminal || 'Barra'}`);
-                        addAuditLog('LOGÍSTICA_ENVÍO', 'logistics', `Pedido ${incident.title.replace('🔓 APROBACIÓN REQUERIDA: ', '')} en camino hacia ${incident.terminal || 'Barra'}`);
-                    }
-                }}
                 onConfirmReceipt={(id) => {
                     const incident = data.incidents.find(i => i.id === id);
                     if (incident && incident.stockItemId && incident.quantity) {
@@ -567,14 +565,8 @@ const App: React.FC = () => {
                 onResolveIncident={(id, status) => updateData({ incidents: data.incidents.map(i => i.id === id ? { ...i, status: (status as Incident['status']) || 'RESOLVED' } : i) })}
                 onUpdateStock={(id, q) => updateData({ stock: data.stock.map(i => i.id === id ? { ...i, quantity: q } : i) })}
                 onUpdateWorkload={handleKioskWorkloadUpdate}
-                onMarkAsDelivered={(id) => {
-                    updateData({ incidents: data.incidents.map(i => i.id === id ? { ...i, status: 'DELIVERED', deliveredAt: new Date().toISOString(), deliveredBy: userRole } : i) });
-                    const incident = data.incidents.find(i => i.id === id);
-                    if (incident) {
-                        sendPushAlert('🚚 PEDIDO EN CAMINO', `Logística ha enviado tu petición de ${incident.title.replace('🔓 APROBACIÓN REQUERIDA: ', '')} al ${incident.terminal || 'Barra'}`);
-                        addAuditLog('LOGÍSTICA_ENVÍO', 'logistics', `Pedido ${incident.title.replace('🔓 APROBACIÓN REQUERIDA: ', '')} en camino hacia ${incident.terminal || 'Barra'}`);
-                    }
-                }}
+
+
                 onConfirmReceipt={(id) => {
                     const incident = data.incidents.find(i => i.id === id);
                     if (incident && incident.stockItemId && incident.quantity) {
@@ -628,7 +620,7 @@ const App: React.FC = () => {
     };
 
     return (
-        <Layout currentView={currentView} onChangeView={safeSetCurrentView} onOpenAI={() => setIsAiOpen(true)} userRole={userRole} onLogout={() => safeSetUserRole(null)} peerCount={peerCount} onForceSync={() => { }} appConfig={data.appConfig}>
+        <Layout currentView={currentView} onChangeView={safeSetCurrentView} onOpenAI={() => setIsAiOpen(true)} userRole={userRole} onLogout={() => safeSetUserRole(null)} peerCount={peerCount} onForceSync={() => { setDoc(doc(db, 'falla/merello2026'), { ...data, lastModified: Date.now() }).then(() => toast.success('Datos sincronizados con Firebase ✅')).catch(() => toast.error('Error al sincronizar')); }} appConfig={data.appConfig}>
             <GlobalAlertOverlay />
             <audio ref={silentAudioRef} src={SILENT_MP3} loop muted style={{ display: 'none' }} />
             <ErrorBoundary>

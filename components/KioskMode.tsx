@@ -32,7 +32,6 @@ interface KioskModeProps {
     initialMode: 'VENTA' | 'CASAL';
     mode?: 'POS' | 'STOCK_ONLY' | 'LOGISTICS';
     userRole: UserRole;
-    onMarkAsDelivered?: (incidentId: string) => void;
     onConfirmReceipt?: (incidentId: string) => void;
 }
 
@@ -49,7 +48,6 @@ export const KioskMode: React.FC<KioskModeProps> = ({
     initialMode,
     mode = 'POS',
     userRole,
-    onMarkAsDelivered,
     onConfirmReceipt
 }) => {
     // --- STATE ---

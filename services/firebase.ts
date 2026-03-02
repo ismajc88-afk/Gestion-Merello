@@ -1,7 +1,8 @@
 import { initializeApp } from "firebase/app";
 import {
-    getFirestore,
-    enableIndexedDbPersistence,
+    initializeFirestore,
+    persistentLocalCache,
+    persistentMultipleTabManager,
     collection,
     doc,
     setDoc,
@@ -19,16 +20,14 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
 
-// Habilitar persistencia offline para que la app siga funcionando sin cobertura
-enableIndexedDbPersistence(db)
-    .catch((err) => {
-        if (err.code == 'failed-precondition') {
-            console.warn('Persistencia Firestore: Múltiples pestañas abiertas, modo offline solo activo en una.');
-        } else if (err.code == 'unimplemented') {
-            console.warn('Persistencia Firestore: El navegador no soporta IndexedDB.');
-        }
-    });
+// Persistencia offline moderna (reemplaza enableIndexedDbPersistence legacy)
+// - Soporta múltiples pestañas simultáneas sin errores
+// - Más eficiente en gestión de caché
+const db = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager()
+    })
+});
 
 export { db, doc, setDoc, onSnapshot, getDoc, collection };
