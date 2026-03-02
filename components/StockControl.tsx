@@ -24,11 +24,12 @@ interface Props {
    onAddItem: (item: Omit<StockItem, 'id' | 'lastUpdated'>) => void;
    onUpdateItem: (id: string, updates: Partial<StockItem>) => void;
    onDelete: (id: string) => void;
+   onAddShoppingItems?: (items: { name: string; quantity: number; unit: string; estimatedCost?: number; notes?: string }[]) => void;
 }
 
 export const StockControl: React.FC<Props> = ({
    items, categories, categoryDefs = PREDEFINED_STOCK_CATEGORIES, units, barSessions = [], incidents = [],
-   onUpdateStock, onAddItem, onDelete, onUpdateItem
+   onUpdateStock, onAddItem, onDelete, onUpdateItem, onAddShoppingItems
 }) => {
    const [filterCat, setFilterCat] = useState<string>('ALL');
    const [filterUsage, setFilterUsage] = useState<'ALL' | 'CASAL' | 'VENTA'>('ALL');
@@ -40,6 +41,8 @@ export const StockControl: React.FC<Props> = ({
 
    // Menu contextual para móvil
    const [contextMenu, setContextMenu] = useState<string | null>(null);
+   const [showDraftOrder, setShowDraftOrder] = useState(false);
+   const [draftItems, setDraftItems] = useState<{ id: string; name: string; current: number; min: number; toOrder: number; unit: string; costPerUnit: number; checked: boolean }[]>([]);
 
    const [newItem, setNewItem] = useState<Partial<StockItem>>({
       name: '', quantity: 0, minStock: 5, unit: units[0] || 'u', category: categories[0] || 'BEBIDAS', subCategory: '', location: 'Almacén', costPerUnit: 0, usageType: 'CASAL', dailyLimit: 0
@@ -169,6 +172,37 @@ export const StockControl: React.FC<Props> = ({
       }
    };
 
+   // --- PEDIDO MÍNIMO ---
+   const lowStockItems = useMemo(() => items.filter(i => i.quantity < i.minStock && i.minStock > 0), [items]);
+
+   const generateDraft = () => {
+      setDraftItems(lowStockItems.map(i => ({
+         id: i.id,
+         name: i.name,
+         current: i.quantity,
+         min: i.minStock,
+         toOrder: i.minStock - i.quantity,
+         unit: i.unit,
+         costPerUnit: i.costPerUnit,
+         checked: true
+      })));
+      setShowDraftOrder(true);
+   };
+
+   const confirmDraft = () => {
+      const selected = draftItems.filter(d => d.checked && d.toOrder > 0);
+      if (selected.length === 0) return;
+      onAddShoppingItems?.(selected.map(d => ({
+         name: d.name,
+         quantity: d.toOrder,
+         unit: d.unit,
+         estimatedCost: +(d.toOrder * d.costPerUnit).toFixed(2),
+         notes: `Pedido mínimo automático (stock: ${d.current}/${d.min})`
+      })));
+      setShowDraftOrder(false);
+      setDraftItems([]);
+   };
+
    return (
       <div className="flex flex-col gap-4 md:gap-6 animate-in fade-in duration-500 w-full pb-32">
 
@@ -201,6 +235,14 @@ export const StockControl: React.FC<Props> = ({
             <button onClick={() => setShowAddForm(true)} className="bg-white border-2 border-slate-200 rounded-[32px] p-6 text-slate-900 shadow-sm flex flex-col items-center justify-center gap-3 active:scale-95 transition-all h-32 md:h-40 hover:border-indigo-300 group">
                <div className="p-3 bg-slate-100 group-hover:bg-indigo-50 group-hover:text-indigo-600 rounded-full transition-colors"><Plus size={32} /></div>
                <span className="font-black uppercase text-xs tracking-widest text-slate-500 group-hover:text-indigo-600">Nuevo Producto</span>
+            </button>
+
+            <button onClick={generateDraft} className={`bg-white border-2 rounded-[32px] p-6 text-slate-900 shadow-sm flex flex-col items-center justify-center gap-3 active:scale-95 transition-all h-32 md:h-40 group ${lowStockItems.length > 0 ? 'border-rose-300 hover:border-rose-500 ring-2 ring-rose-100' : 'border-slate-200 hover:border-slate-300'}`}>
+               <div className={`p-3 rounded-full transition-colors relative ${lowStockItems.length > 0 ? 'bg-rose-100 text-rose-600 group-hover:bg-rose-200' : 'bg-slate-100 text-slate-400'}`}>
+                  <ShoppingBag size={32} />
+                  {lowStockItems.length > 0 && <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white text-[10px] font-black rounded-full flex items-center justify-center animate-pulse">{lowStockItems.length}</span>}
+               </div>
+               <span className={`font-black uppercase text-[10px] tracking-widest ${lowStockItems.length > 0 ? 'text-rose-600' : 'text-slate-400'}`}>Pedido Mínimo</span>
             </button>
          </div>
 
@@ -586,6 +628,68 @@ export const StockControl: React.FC<Props> = ({
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 20px; }
         .snap-x > div { scroll-snap-align: center; }
       `}</style>
+
+         {/* --- DRAFT ORDER MODAL --- */}
+         {showDraftOrder && (
+            <div className="fixed inset-0 z-[200] bg-slate-950/80 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-4">
+               <div className="bg-white p-6 md:p-8 rounded-t-[40px] md:rounded-[40px] w-full max-w-lg shadow-2xl animate-in slide-in-from-bottom md:zoom-in-95 border-t-4 md:border-4 border-rose-500 max-h-[90vh] overflow-y-auto">
+                  <div className="flex justify-between items-center mb-6">
+                     <div>
+                        <h3 className="text-xl font-black uppercase italic tracking-tighter">Pedido Mínimo</h3>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">{draftItems.filter(d => d.checked).length} productos seleccionados</p>
+                     </div>
+                     <button onClick={() => setShowDraftOrder(false)} className="p-2 bg-slate-100 rounded-full"><X size={20} /></button>
+                  </div>
+
+                  {draftItems.length === 0 ? (
+                     <div className="py-12 text-center">
+                        <Package size={48} className="mx-auto text-emerald-300 mb-4" />
+                        <p className="font-black text-emerald-600 uppercase text-sm">¡Todo el stock está OK!</p>
+                        <p className="text-xs text-slate-400 mt-2">Ningún producto por debajo de su mínimo</p>
+                     </div>
+                  ) : (
+                     <div className="space-y-3 mb-6">
+                        {draftItems.map((d, idx) => (
+                           <div key={d.id} className={`p-4 rounded-2xl border-2 transition-all ${d.checked ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-slate-100 opacity-50'}`}>
+                              <div className="flex items-center gap-3">
+                                 <button onClick={() => setDraftItems(prev => prev.map((p, i) => i === idx ? { ...p, checked: !p.checked } : p))} className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 transition-colors ${d.checked ? 'bg-rose-500 border-rose-500 text-white' : 'border-slate-300'}`}>
+                                    {d.checked && <Save size={12} />}
+                                 </button>
+                                 <div className="flex-1 min-w-0">
+                                    <p className="font-black text-sm uppercase truncate">{d.name}</p>
+                                    <p className="text-[10px] font-bold text-slate-400">Stock: {d.current}/{d.min} {d.unit} · Coste: {(d.toOrder * d.costPerUnit).toFixed(2)}€</p>
+                                 </div>
+                                 <div className="flex items-center gap-1 shrink-0">
+                                    <button onClick={() => setDraftItems(prev => prev.map((p, i) => i === idx ? { ...p, toOrder: Math.max(1, p.toOrder - 1) } : p))} className="w-8 h-8 bg-white border rounded-lg flex items-center justify-center">
+                                       <Minus size={14} />
+                                    </button>
+                                    <span className="w-10 text-center font-black text-lg">{d.toOrder}</span>
+                                    <button onClick={() => setDraftItems(prev => prev.map((p, i) => i === idx ? { ...p, toOrder: p.toOrder + 1 } : p))} className="w-8 h-8 bg-rose-500 text-white rounded-lg flex items-center justify-center">
+                                       <Plus size={14} />
+                                    </button>
+                                 </div>
+                              </div>
+                           </div>
+                        ))}
+                     </div>
+                  )}
+
+                  {draftItems.length > 0 && (
+                     <div className="space-y-3">
+                        <div className="bg-slate-50 p-4 rounded-2xl flex justify-between items-center">
+                           <span className="text-xs font-black text-slate-500 uppercase">Coste estimado total</span>
+                           <span className="text-xl font-black text-rose-600">{draftItems.filter(d => d.checked).reduce((acc, d) => acc + d.toOrder * d.costPerUnit, 0).toFixed(2)}€</span>
+                        </div>
+                        <button onClick={confirmDraft} disabled={draftItems.filter(d => d.checked).length === 0} className="w-full py-5 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-300 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl transition-colors">
+                           Añadir {draftItems.filter(d => d.checked).length} productos a la Lista de Compras
+                        </button>
+                     </div>
+                  )}
+               </div>
+            </div>
+         )}
+
       </div>
    );
 };
+
