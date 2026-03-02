@@ -460,75 +460,69 @@ export const KioskMode: React.FC<KioskModeProps> = ({
                         const limit = item.dailyLimit || 0;
                         const todayUsage = limit > 0 ? getTodayUsage(item.id) : 0;
                         const remaining = Math.max(0, limit - todayUsage);
+                        const stockPercent = item.minStock > 0 ? Math.min((item.quantity / (item.minStock * 2)) * 100, 100) : 100;
 
-                        // Gradientes únicos según el estado
-                        const cardGradient = isLow
-                            ? 'from-amber-500/20 via-orange-500/20 to-red-500/20'
-                            : 'from-slate-800/50 via-slate-700/50 to-slate-800/50';
-
-                        const borderColor = isLow
-                            ? 'border-amber-500/40'
-                            : 'border-slate-600/30 hover:border-blue-500/50';
+                        // Emoji según categoría para distinguir visualmente
+                        const catEmoji = item.category?.includes('BEBIDA') ? '🍺'
+                            : item.category?.includes('LICOR') ? '🥃'
+                                : item.category?.includes('REFRESCO') ? '🥤'
+                                    : item.category?.includes('VINO') ? '🍷'
+                                        : item.category?.includes('SUMINISTRO') ? '🧻'
+                                            : item.category?.includes('COMIDA') ? '🍖'
+                                                : item.category?.includes('HIELO') ? '🧊'
+                                                    : item.category?.includes('VASO') ? '🥤'
+                                                        : '📦';
 
                         return (
                             <button
                                 key={item.id}
                                 onClick={() => { setRestockItem(item); setRestockQty(1); }}
-                                className={`group relative p-5 rounded-[24px] bg-gradient-to-br ${cardGradient} backdrop-blur-md border-2 ${borderColor}
-                                      flex flex-col min-h-[240px] cursor-pointer transition-all duration-300
-                                      hover:scale-105 hover:shadow-2xl ${isLow ? 'hover:shadow-amber-500/30' : 'hover:shadow-blue-500/20'}
-                                      active:scale-95 overflow-hidden`}
+                                className={`group relative rounded-[28px] overflow-hidden cursor-pointer transition-all duration-300
+                                      hover:-translate-y-1 hover:shadow-2xl active:scale-95
+                                      ${isLow
+                                        ? 'bg-gradient-to-br from-amber-500/10 to-red-500/10 border-2 border-amber-500/50 shadow-lg shadow-amber-500/10 hover:shadow-amber-500/30'
+                                        : 'bg-white/[0.04] border-2 border-white/10 hover:border-indigo-500/40 hover:shadow-indigo-500/20'
+                                    }`}
                             >
-                                {/* Efecto de brillo al hover */}
-                                <div className="absolute inset-0 bg-gradient-to-br from-white/0 via-white/5 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity rounded-[24px]"></div>
+                                {/* Glow effect */}
+                                <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ${isLow ? 'bg-gradient-to-t from-amber-500/10 to-transparent' : 'bg-gradient-to-t from-indigo-500/10 to-transparent'}`}></div>
 
-                                {/* Partículas decorativas */}
-                                <div className="absolute top-3 right-3 w-20 h-20 bg-gradient-to-br from-white/5 to-transparent rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
-
-                                {/* Header con icono y badge */}
-                                <div className="relative z-10 flex justify-between items-start mb-3">
-                                    <div className={`p-2.5 rounded-xl backdrop-blur-sm shadow-lg ${isLow
-                                        ? 'bg-amber-500/20 text-amber-300 shadow-amber-500/20'
-                                        : 'bg-blue-500/20 text-blue-300 shadow-blue-500/20'
-                                        }`}>
-                                        {item.category?.includes('BEBIDA') ? <Wine size={20} /> : <Package size={20} />}
+                                {/* Content */}
+                                <div className="relative z-10 p-4 flex flex-col h-[180px]">
+                                    {/* Top row: emoji + badge */}
+                                    <div className="flex justify-between items-start mb-2">
+                                        <span className="text-3xl drop-shadow-lg group-hover:scale-110 transition-transform">{catEmoji}</span>
+                                        {isLow && (
+                                            <span className="px-2 py-0.5 bg-amber-500 text-[9px] font-black uppercase rounded-full text-amber-950 animate-pulse shadow-lg">⚠ Bajo</span>
+                                        )}
+                                        {limit > 0 && !isLow && (
+                                            <span className="px-2 py-0.5 bg-slate-700/80 text-[9px] font-black uppercase rounded-full text-slate-300 border border-white/10">{remaining}/{limit}</span>
+                                        )}
                                     </div>
-                                    {isLow && (
-                                        <div className="flex items-center gap-1 bg-amber-500/90 text-amber-950 px-2.5 py-1 rounded-full shadow-lg animate-pulse">
-                                            <AlertTriangle size={12} />
-                                            <span className="text-[10px] font-black uppercase">Bajo</span>
+
+                                    {/* Product name */}
+                                    <h4 className="font-black text-sm uppercase text-white leading-snug line-clamp-2 mb-auto tracking-tight">
+                                        {item.name}
+                                    </h4>
+
+                                    {/* Bottom: stock bar + number */}
+                                    <div className="mt-3 space-y-2">
+                                        {/* Stock progress bar */}
+                                        <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                                            <div
+                                                className={`h-full rounded-full transition-all duration-700 ${isLow ? 'bg-gradient-to-r from-amber-500 to-red-500' : 'bg-gradient-to-r from-emerald-500 to-cyan-400'}`}
+                                                style={{ width: `${stockPercent}%` }}
+                                            ></div>
                                         </div>
-                                    )}
-                                </div>
 
-                                {/* Nombre del producto */}
-                                <h4 className="relative z-10 font-black text-base uppercase text-white leading-tight mb-4 line-clamp-2 drop-shadow-lg min-h-[2.5rem]">
-                                    {item.name}
-                                </h4>
-
-                                {/* Información inferior */}
-                                <div className="relative z-10 mt-auto space-y-2.5">
-                                    {limit > 0 ? (
-                                        <div className="bg-slate-950/50 backdrop-blur-sm rounded-xl p-2.5 border border-white/10">
-                                            <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Cupo Diario</p>
-                                            <div className="flex items-baseline gap-1.5">
-                                                <span className="text-2xl font-black text-white drop-shadow-lg">{remaining}</span>
-                                                <span className="text-xs text-slate-500">/ {limit}</span>
+                                        {/* Stock number */}
+                                        <div className="flex justify-between items-baseline">
+                                            <span className="text-[9px] font-bold text-slate-500 uppercase">Stock</span>
+                                            <div className="flex items-baseline gap-1">
+                                                <span className={`text-xl font-black tabular-nums ${isLow ? 'text-amber-400' : 'text-white'}`}>{item.quantity}</span>
+                                                <span className="text-[10px] font-bold text-slate-500">{item.unit}</span>
                                             </div>
                                         </div>
-                                    ) : (
-                                        <div className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-emerald-500/20 to-green-500/20 px-2.5 py-2 rounded-xl border border-emerald-500/30">
-                                            <Zap size={14} className="text-emerald-400" />
-                                            <span className="text-[10px] font-black uppercase text-emerald-300">Barra Libre</span>
-                                        </div>
-                                    )}
-
-                                    <div className="flex justify-between items-center bg-slate-950/50 backdrop-blur-sm rounded-xl p-2.5 border border-white/10">
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase">Stock</span>
-                                        <span className={`text-xl font-black drop-shadow-lg ${isLow ? 'text-amber-400' : 'text-white'
-                                            }`}>
-                                            {item.quantity}
-                                        </span>
                                     </div>
                                 </div>
                             </button>
