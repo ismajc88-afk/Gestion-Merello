@@ -483,6 +483,17 @@ export const StockControl: React.FC<Props> = ({
                         </div>
                      </div>
 
+                     <div className="grid grid-cols-2 gap-4">
+                        <div>
+                           <label className="text-[9px] font-bold text-emerald-500 uppercase ml-2 flex items-center gap-1">💰 Coste/ud (€)</label>
+                           <input type="number" step="0.01" placeholder="0.00" value={newItem.costPerUnit || ''} onChange={e => setNewItem({ ...newItem, costPerUnit: Number(e.target.value) })} className="w-full p-4 bg-emerald-50 border-2 border-emerald-200 rounded-2xl font-black text-center text-lg outline-none focus:border-emerald-500 text-emerald-700" />
+                        </div>
+                        <div>
+                           <label className="text-[9px] font-bold text-slate-400 uppercase ml-2">Stock Mínimo</label>
+                           <input type="number" value={newItem.minStock} onChange={e => setNewItem({ ...newItem, minStock: Number(e.target.value) })} className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-center text-lg outline-none focus:border-indigo-500" />
+                        </div>
+                     </div>
+
                      {/* Daily Limit Input for CASAL */}
                      {newItem.usageType === 'CASAL' && (
                         <div className="bg-orange-50 p-4 rounded-2xl border border-orange-100">
