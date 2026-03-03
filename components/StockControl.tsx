@@ -25,11 +25,12 @@ interface Props {
    onUpdateItem: (id: string, updates: Partial<StockItem>) => void;
    onDelete: (id: string) => void;
    onAddShoppingItems?: (items: { name: string; quantity: number; unit: string; estimatedCost?: number; notes?: string }[]) => void;
+   onAutoExpense?: (expense: { description: string; amount: number; category: string; subCategory?: string }) => void;
 }
 
 export const StockControl: React.FC<Props> = ({
    items, categories, categoryDefs = PREDEFINED_STOCK_CATEGORIES, units, barSessions = [], incidents = [],
-   onUpdateStock, onAddItem, onDelete, onUpdateItem, onAddShoppingItems
+   onUpdateStock, onAddItem, onDelete, onUpdateItem, onAddShoppingItems, onAutoExpense
 }) => {
    const [filterCat, setFilterCat] = useState<string>('ALL');
    const [filterUsage, setFilterUsage] = useState<'ALL' | 'CASAL' | 'VENTA'>('ALL');
@@ -43,6 +44,9 @@ export const StockControl: React.FC<Props> = ({
    const [contextMenu, setContextMenu] = useState<string | null>(null);
    const [showDraftOrder, setShowDraftOrder] = useState(false);
    const [draftItems, setDraftItems] = useState<{ id: string; name: string; current: number; min: number; toOrder: number; unit: string; costPerUnit: number; checked: boolean }[]>([]);
+
+   // Estado para el popup de gasto automático
+   const [pendingExpense, setPendingExpense] = useState<{ name: string; qty: number; costPerUnit: number; category: string; subCategory?: string; unit: string } | null>(null);
 
    const [newItem, setNewItem] = useState<Partial<StockItem>>({
       name: '', quantity: 0, minStock: 5, unit: units[0] || 'u', category: categories[0] || 'BEBIDAS', subCategory: '', location: 'Almacén', costPerUnit: 0, usageType: 'CASAL', dailyLimit: 0
@@ -149,25 +153,37 @@ export const StockControl: React.FC<Props> = ({
 
    const handleAddManual = () => {
       if (!newItem.name) return;
+      const qty = Number(newItem.quantity);
+      const cost = Number(newItem.costPerUnit) || 0;
       onAddItem({
          name: newItem.name.toUpperCase(),
-         quantity: Number(newItem.quantity),
+         quantity: qty,
          minStock: Number(newItem.minStock),
          unit: newItem.unit || 'u',
          category: newItem.category || 'BEBIDAS',
          subCategory: newItem.subCategory || undefined,
          location: newItem.location || 'Almacén',
-         costPerUnit: Number(newItem.costPerUnit) || 0,
+         costPerUnit: cost,
          usageType: newItem.usageType as any || 'CASAL',
          dailyLimit: newItem.usageType === 'CASAL' ? Number(newItem.dailyLimit) : undefined
       });
+      // Si tiene cantidad y coste, ofrecer crear gasto
+      if (qty > 0 && cost > 0 && onAutoExpense) {
+         setPendingExpense({ name: newItem.name.toUpperCase(), qty, costPerUnit: cost, category: newItem.category || 'BEBIDAS', subCategory: newItem.subCategory || undefined, unit: newItem.unit || 'u' });
+      }
       setNewItem({ name: '', quantity: 0, minStock: 5, unit: units[0] || 'u', category: categories[0] || 'BEBIDAS', subCategory: '', location: 'Almacén', costPerUnit: 0, usageType: 'CASAL', dailyLimit: 0 });
       setShowAddForm(false);
    };
 
    const handleSaveEdit = () => {
       if (editingItem) {
+         const originalItem = items.find(i => i.id === editingItem.id);
+         const qtyAdded = originalItem ? editingItem.quantity - originalItem.quantity : 0;
          onUpdateItem(editingItem.id, editingItem);
+         // Si se subió la cantidad y tiene coste, ofrecer crear gasto
+         if (qtyAdded > 0 && editingItem.costPerUnit > 0 && onAutoExpense) {
+            setPendingExpense({ name: editingItem.name, qty: qtyAdded, costPerUnit: editingItem.costPerUnit, category: editingItem.category || 'STOCK', subCategory: editingItem.subCategory || undefined, unit: editingItem.unit });
+         }
          setEditingItem(null);
       }
    };
@@ -715,6 +731,63 @@ export const StockControl: React.FC<Props> = ({
                         </button>
                      </div>
                   )}
+               </div>
+            </div>
+         )}
+
+         {/* MODAL: GASTO AUTOMÁTICO POR COMPRA DE STOCK */}
+         {pendingExpense && (
+            <div className="fixed inset-0 z-[500] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+               <div className="bg-white w-full max-w-sm rounded-[32px] p-6 shadow-2xl">
+                  <div className="text-center mb-4">
+                     <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <BadgeEuro size={28} className="text-emerald-600" />
+                     </div>
+                     <h3 className="text-lg font-black text-slate-900 uppercase">¿Registrar gasto?</h3>
+                     <p className="text-xs text-slate-500 mt-1">Has añadido stock con coste. ¿Descontar del presupuesto?</p>
+                  </div>
+
+                  <div className="bg-slate-50 rounded-2xl p-4 space-y-2 mb-4">
+                     <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Producto</span>
+                        <span className="font-black text-slate-900">{pendingExpense.name}</span>
+                     </div>
+                     <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Cantidad</span>
+                        <span className="font-bold">{pendingExpense.qty} {pendingExpense.unit}</span>
+                     </div>
+                     <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Coste unitario</span>
+                        <span className="font-bold">{pendingExpense.costPerUnit.toFixed(2)}€</span>
+                     </div>
+                     <div className="border-t border-slate-200 pt-2 flex justify-between">
+                        <span className="text-sm font-black text-slate-700 uppercase">Total</span>
+                        <span className="text-2xl font-black text-rose-600">{(pendingExpense.qty * pendingExpense.costPerUnit).toFixed(2)}€</span>
+                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                     <button
+                        onClick={() => {
+                           onAutoExpense?.({
+                              description: `Compra stock: ${pendingExpense.name} x${pendingExpense.qty}`,
+                              amount: +(pendingExpense.qty * pendingExpense.costPerUnit).toFixed(2),
+                              category: pendingExpense.category,
+                              subCategory: pendingExpense.subCategory
+                           });
+                           setPendingExpense(null);
+                        }}
+                        className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black uppercase text-sm transition-colors"
+                     >
+                        ✅ Sí, registrar gasto
+                     </button>
+                     <button
+                        onClick={() => setPendingExpense(null)}
+                        className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-2xl font-bold text-xs uppercase transition-colors"
+                     >
+                        No, solo actualizar stock
+                     </button>
+                  </div>
                </div>
             </div>
          )}

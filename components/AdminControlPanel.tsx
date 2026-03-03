@@ -26,9 +26,10 @@ interface Props {
    kioskConfig?: KioskConfig;
    onUpdateKioskConfig?: (config: KioskConfig) => void;
    onClearAuditLog?: () => void;
+   onHardReset?: () => void;
 }
 
-export const AdminControlPanel: React.FC<Props> = ({ data, onUpdateConfig, onResetModule, onFullImport, peerCount = 0, kioskConfig, onUpdateKioskConfig, onClearAuditLog }) => {
+export const AdminControlPanel: React.FC<Props> = ({ data, onUpdateConfig, onResetModule, onFullImport, peerCount = 0, kioskConfig, onUpdateKioskConfig, onClearAuditLog, onHardReset }) => {
    const [config, setConfig] = useState<AppConfig>(data.appConfig);
    const [activeTab, setActiveTab] = useState<'IDENTITY' | 'PRICES' | 'MASTERS' | 'PERMISOS' | 'SYNC' | 'DANGER' | 'AUDIT'>('IDENTITY');
    const [newVal, setNewVal] = useState('');
@@ -634,7 +635,7 @@ export const AdminControlPanel: React.FC<Props> = ({ data, onUpdateConfig, onRes
                      </div>
 
                      <div className="pt-8 border-t border-rose-200">
-                        <button onClick={() => setPendingDangerAction({ title: 'HARD RESET GLOBAL', message: '⚠️ ESTO BORRARÁ ABSOLUTAMENTE TODO EL EJERCICIO PARA EMPEZAR DE CERO. Todos los datos de la Falla se perderán PERMANENTEMENTE. ¿Estás ABSOLUTAMENTE seguro?', confirmWord: 'BORRAR TODO', onConfirm: () => window.location.reload() })} className="w-full py-8 bg-rose-600 text-white rounded-[40px] font-black uppercase text-sm tracking-[0.2em] shadow-2xl flex items-center justify-center gap-4 hover:bg-rose-700 transition-all border-b-8 border-rose-900 active:translate-y-2 active:border-b-0">
+                        <button onClick={() => setPendingDangerAction({ title: 'HARD RESET GLOBAL', message: '⚠️ ESTO BORRARÁ ABSOLUTAMENTE TODO: censo, tesorería, stock, tareas, pedidos, sesiones de barra, log de auditoría... TODOS los datos se eliminarán de Firebase PERMANENTEMENTE. La app volverá al estado de fábrica. ¿Estás ABSOLUTAMENTE seguro?', confirmWord: 'BORRAR TODO', onConfirm: () => { onHardReset?.(); } })} className="w-full py-8 bg-rose-600 text-white rounded-[40px] font-black uppercase text-sm tracking-[0.2em] shadow-2xl flex items-center justify-center gap-4 hover:bg-rose-700 transition-all border-b-8 border-rose-900 active:translate-y-2 active:border-b-0">
                            <RefreshCw size={24} className="animate-spin-slow" /> HARD RESET GLOBAL DEL SISTEMA
                         </button>
                      </div>

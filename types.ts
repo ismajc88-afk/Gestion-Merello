@@ -164,6 +164,7 @@ export interface Transaction {
   type: TransactionType;
   date: string;
   category: string;
+  subCategory?: string;
   isBarInvestment?: boolean;
 }
 

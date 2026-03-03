@@ -203,6 +203,18 @@ export const useAppData = () => {
     if (key === 'stock') updateData({ stock: [] });
   }, [updateData]);
 
+  // HARD RESET: sobreescribe TODO con defaults (borra Firebase + localStorage)
+  const resetFullApp = useCallback(() => {
+    localStorage.clear();
+    setData({ ...DEFAULT_DATA });
+    // Forzar subida inmediata a Firebase antes de recargar
+    setDoc(doc(db, FIREBASE_DOC_PATH), { ...DEFAULT_DATA }).then(() => {
+      window.location.reload();
+    }).catch(() => {
+      window.location.reload();
+    });
+  }, [setData]);
+
   return {
     data,
     updateData, // Exposed for simple updates
@@ -217,7 +229,8 @@ export const useAppData = () => {
     actions: {
       handleMarkOrderReceived,
       handleShoppingToggle,
-      resetModule
+      resetModule,
+      resetFullApp
     }
   };
 };
