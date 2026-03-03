@@ -13,6 +13,7 @@ import {
 import { SyncModules } from './SyncModules';
 import { RolePermissionsPanel } from './RolePermissionsPanel';
 import { AuditLog } from './AuditLog';
+import { ConfirmModal } from './ConfirmModal';
 import { History, DownloadCloud } from 'lucide-react';
 import { db, doc, setDoc } from '../services/firebase';
 
@@ -40,6 +41,7 @@ export const AdminControlPanel: React.FC<Props> = ({ data, onUpdateConfig, onRes
    // Backups State
    const [backups, setBackups] = useState<any[]>([]);
    const [isBackingUp, setIsBackingUp] = useState(false);
+   const [pendingDangerAction, setPendingDangerAction] = useState<{ title: string; message: string; confirmWord: string; onConfirm: () => void } | null>(null);
 
    // Carga de Backups Históricos
    const loadBackups = async () => {
@@ -609,22 +611,22 @@ export const AdminControlPanel: React.FC<Props> = ({ data, onUpdateConfig, onRes
                      </div>
 
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <button onClick={() => confirm('¿Purgar censo completo?') && onResetModule('members')} className="p-8 bg-white border-2 border-rose-100 rounded-[40px] text-left hover:border-rose-500 group transition-all shadow-sm hover:shadow-xl">
+                        <button onClick={() => setPendingDangerAction({ title: 'Resetear Censo', message: 'Se borrarán TODOS los falleros, sus misiones y registros de presencia. Esta acción es IRREVERSIBLE.', confirmWord: 'CONFIRMAR', onConfirm: () => onResetModule('members') })} className="p-8 bg-white border-2 border-rose-100 rounded-[40px] text-left hover:border-rose-500 group transition-all shadow-sm hover:shadow-xl">
                            <Users className="text-rose-400 group-hover:text-rose-600 mb-4" size={32} />
                            <h4 className="font-black uppercase text-xs tracking-widest text-slate-800">Resetear Censo</h4>
                            <p className="text-[10px] text-slate-400 font-medium mt-2 italic leading-relaxed">Borra a todos los falleros, sus misiones y registros de presencia.</p>
                         </button>
-                        <button onClick={() => confirm('¿Borrar toda la contabilidad?') && onResetModule('transactions')} className="p-8 bg-white border-2 border-rose-100 rounded-[40px] text-left hover:border-rose-500 group transition-all shadow-sm hover:shadow-xl">
+                        <button onClick={() => setPendingDangerAction({ title: 'Resetear Caja', message: 'Se borrará TODO el historial de ingresos, gastos y el saldo actual de tesorería. Esta acción es IRREVERSIBLE.', confirmWord: 'CONFIRMAR', onConfirm: () => onResetModule('transactions') })} className="p-8 bg-white border-2 border-rose-100 rounded-[40px] text-left hover:border-rose-500 group transition-all shadow-sm hover:shadow-xl">
                            <Wallet className="text-rose-400 group-hover:text-rose-600 mb-4" size={32} />
                            <h4 className="font-black uppercase text-xs tracking-widest text-slate-800">Resetear Caja</h4>
                            <p className="text-[10px] text-slate-400 font-medium mt-2 italic leading-relaxed">Limpia el historial de ingresos, gastos y el saldo actual de tesorería.</p>
                         </button>
-                        <button onClick={() => confirm('¿Limpiar tablero de tareas?') && onResetModule('tasks')} className="p-8 bg-white border-2 border-rose-100 rounded-[40px] text-left hover:border-rose-500 group transition-all shadow-sm hover:shadow-xl">
+                        <button onClick={() => setPendingDangerAction({ title: 'Limpiar Tareas', message: 'Se eliminará TODO el tablero logístico y las sub-misiones activas. Esta acción es IRREVERSIBLE.', confirmWord: 'CONFIRMAR', onConfirm: () => onResetModule('tasks') })} className="p-8 bg-white border-2 border-rose-100 rounded-[40px] text-left hover:border-rose-500 group transition-all shadow-sm hover:shadow-xl">
                            <ClipboardList className="text-rose-400 group-hover:text-rose-600 mb-4" size={32} />
                            <h4 className="font-black uppercase text-xs tracking-widest text-slate-800">Limpiar Tareas</h4>
                            <p className="text-[10px] text-slate-400 font-medium mt-2 italic leading-relaxed">Elimina todo el tablero logístico y las sub-misiones activas.</p>
                         </button>
-                        <button onClick={() => confirm('¿Purgar almacenes e inventario?') && onResetModule('stock')} className="p-8 bg-white border-2 border-rose-100 rounded-[40px] text-left hover:border-rose-500 group transition-all shadow-sm hover:shadow-xl">
+                        <button onClick={() => setPendingDangerAction({ title: 'Vaciar Inventario', message: 'Se borrarán TODOS los artículos registrados en las bodegas de Venta y Casal. Esta acción es IRREVERSIBLE.', confirmWord: 'CONFIRMAR', onConfirm: () => onResetModule('stock') })} className="p-8 bg-white border-2 border-rose-100 rounded-[40px] text-left hover:border-rose-500 group transition-all shadow-sm hover:shadow-xl">
                            <Box className="text-rose-400 group-hover:text-rose-600 mb-4" size={32} />
                            <h4 className="font-black uppercase text-xs tracking-widest text-slate-800">Vaciar Inventario</h4>
                            <p className="text-[10px] text-slate-400 font-medium mt-2 italic leading-relaxed">Borra todos los artículos registrados en las bodegas de Venta y Casal.</p>
@@ -632,7 +634,7 @@ export const AdminControlPanel: React.FC<Props> = ({ data, onUpdateConfig, onRes
                      </div>
 
                      <div className="pt-8 border-t border-rose-200">
-                        <button onClick={() => confirm('⚠️⚠️⚠️ ESTO BORRARÁ TODO EL EJERCICIO PARA EMPEZAR DE CERO. ¿ESTÁS SEGURO?') && window.location.reload()} className="w-full py-8 bg-rose-600 text-white rounded-[40px] font-black uppercase text-sm tracking-[0.2em] shadow-2xl flex items-center justify-center gap-4 hover:bg-rose-700 transition-all border-b-8 border-rose-900 active:translate-y-2 active:border-b-0">
+                        <button onClick={() => setPendingDangerAction({ title: 'HARD RESET GLOBAL', message: '⚠️ ESTO BORRARÁ ABSOLUTAMENTE TODO EL EJERCICIO PARA EMPEZAR DE CERO. Todos los datos de la Falla se perderán PERMANENTEMENTE. ¿Estás ABSOLUTAMENTE seguro?', confirmWord: 'BORRAR TODO', onConfirm: () => window.location.reload() })} className="w-full py-8 bg-rose-600 text-white rounded-[40px] font-black uppercase text-sm tracking-[0.2em] shadow-2xl flex items-center justify-center gap-4 hover:bg-rose-700 transition-all border-b-8 border-rose-900 active:translate-y-2 active:border-b-0">
                            <RefreshCw size={24} className="animate-spin-slow" /> HARD RESET GLOBAL DEL SISTEMA
                         </button>
                      </div>
@@ -683,6 +685,15 @@ export const AdminControlPanel: React.FC<Props> = ({ data, onUpdateConfig, onRes
         .animate-spin-slow { animation: spin 8s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
+
+         <ConfirmModal
+            isOpen={!!pendingDangerAction}
+            title={pendingDangerAction?.title || ''}
+            message={pendingDangerAction?.message || ''}
+            confirmWord={pendingDangerAction?.confirmWord || 'CONFIRMAR'}
+            onConfirm={() => { pendingDangerAction?.onConfirm(); setPendingDangerAction(null); }}
+            onCancel={() => setPendingDangerAction(null)}
+         />
       </div >
    );
 };

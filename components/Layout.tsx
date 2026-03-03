@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
    LayoutDashboard, Wallet, ShoppingCart, Users, Beer,
    Calculator, Monitor, Settings, FileText,
@@ -23,11 +23,52 @@ interface LayoutProps {
 }
 
 export const Layout: React.FC<LayoutProps> = ({
-   currentView, onChangeView, children, onOpenAI, userRole, onLogout, peerCount, appConfig
+   currentView, onChangeView, children, onOpenAI, userRole, onLogout, peerCount, onForceSync, appConfig
 }) => {
    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
    const [isFullscreen, setIsFullscreen] = useState(false);
    const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+   // --- PULL-TO-REFRESH ---
+   const scrollRef = useRef<HTMLDivElement>(null);
+   const [pullDistance, setPullDistance] = useState(0);
+   const [isRefreshing, setIsRefreshing] = useState(false);
+   const touchStartY = useRef(0);
+   const isPulling = useRef(false);
+   const PULL_THRESHOLD = 80;
+
+   const onTouchStart = useCallback((e: React.TouchEvent) => {
+      if (scrollRef.current && scrollRef.current.scrollTop <= 0) {
+         touchStartY.current = e.touches[0].clientY;
+         isPulling.current = true;
+      }
+   }, []);
+
+   const onTouchMove = useCallback((e: React.TouchEvent) => {
+      if (!isPulling.current) return;
+      const deltaY = e.touches[0].clientY - touchStartY.current;
+      if (deltaY > 0 && scrollRef.current && scrollRef.current.scrollTop <= 0) {
+         setPullDistance(Math.min(deltaY * 0.5, 120));
+      } else {
+         isPulling.current = false;
+         setPullDistance(0);
+      }
+   }, []);
+
+   const onTouchEnd = useCallback(() => {
+      if (pullDistance >= PULL_THRESHOLD && !isRefreshing) {
+         setIsRefreshing(true);
+         setPullDistance(PULL_THRESHOLD);
+         onForceSync();
+         setTimeout(() => {
+            setIsRefreshing(false);
+            setPullDistance(0);
+         }, 1500);
+      } else {
+         setPullDistance(0);
+      }
+      isPulling.current = false;
+   }, [pullDistance, isRefreshing, onForceSync]);
 
    useEffect(() => {
       const handleFullscreenChange = () => {
@@ -261,7 +302,27 @@ export const Layout: React.FC<LayoutProps> = ({
             </header>
 
             {/* SCROLLABLE VIEW CONTAINER */}
-            <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-10 scroll-smooth">
+            <div
+               ref={scrollRef}
+               onTouchStart={onTouchStart}
+               onTouchMove={onTouchMove}
+               onTouchEnd={onTouchEnd}
+               className="flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-10 scroll-smooth relative"
+            >
+               {/* Pull indicator */}
+               {pullDistance > 0 && (
+                  <div className="flex justify-center items-center transition-all" style={{ height: pullDistance }}>
+                     <div className={`flex flex-col items-center gap-1 transition-transform ${isRefreshing ? 'animate-spin' : ''}`} style={{ transform: `rotate(${pullDistance * 3}deg)` }}>
+                        <div className={`w-8 h-8 rounded-full border-4 ${pullDistance >= PULL_THRESHOLD ? 'border-blue-500 border-t-transparent' : 'border-slate-300 border-t-transparent'}`}></div>
+                     </div>
+                     {!isRefreshing && pullDistance >= PULL_THRESHOLD && (
+                        <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest ml-3">Suelta para sincronizar</span>
+                     )}
+                     {isRefreshing && (
+                        <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest ml-3">Sincronizando...</span>
+                     )}
+                  </div>
+               )}
                <div className="max-w-7xl mx-auto h-full pb-32 lg:pb-0">
                   {children}
                </div>
