@@ -207,7 +207,7 @@ export const StockControl: React.FC<Props> = ({
       <div className="flex flex-col gap-4 md:gap-6 animate-in fade-in duration-500 w-full pb-32">
 
          {/* 1. KPIs HEADER */}
-         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="bg-slate-900 rounded-[32px] p-6 text-white relative overflow-hidden shadow-xl flex flex-col justify-between h-32 md:h-40 group">
                <div className="relative z-10">
                   <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Valor Venta</p>
@@ -230,6 +230,18 @@ export const StockControl: React.FC<Props> = ({
                   <span className="text-[10px] font-bold text-orange-400 uppercase">Consumo Interno</span>
                </div>
                <User size={100} className="absolute -right-4 -bottom-6 opacity-5 rotate-12 text-orange-600 group-hover:scale-110 transition-transform" />
+            </div>
+
+            <div className="bg-gradient-to-br from-emerald-500 to-emerald-700 rounded-[32px] p-6 text-white relative overflow-hidden shadow-xl flex flex-col justify-between h-32 md:h-40 group col-span-2 md:col-span-1">
+               <div className="relative z-10">
+                  <p className="text-[10px] font-black text-emerald-200 uppercase tracking-widest mb-1">Coste Total Inventario</p>
+                  <h3 className="text-3xl md:text-4xl font-black tabular-nums">{items.reduce((acc, i) => acc + (i.quantity * i.costPerUnit), 0).toLocaleString('es-ES', { maximumFractionDigits: 0 })}€</h3>
+               </div>
+               <div className="relative z-10 flex items-center gap-2">
+                  <div className="w-2 h-2 bg-emerald-300 rounded-full animate-pulse"></div>
+                  <span className="text-[10px] font-bold text-emerald-200 uppercase">{items.length} productos</span>
+               </div>
+               <BadgeEuro size={100} className="absolute -right-4 -bottom-6 opacity-10 rotate-12 group-hover:scale-110 transition-transform" />
             </div>
 
             <button onClick={() => setShowAddForm(true)} className="bg-white border-2 border-slate-200 rounded-[32px] p-6 text-slate-900 shadow-sm flex flex-col items-center justify-center gap-3 active:scale-95 transition-all h-32 md:h-40 hover:border-indigo-300 group">

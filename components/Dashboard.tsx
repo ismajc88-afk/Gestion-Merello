@@ -6,7 +6,8 @@ import {
 } from 'recharts';
 import {
     Wallet, Clock, Utensils, Beer, AlertTriangle, Check,
-    Siren, Home, Flame, BatteryMedium, BatteryFull, Package
+    Siren, Home, Flame, BatteryMedium, BatteryFull, Package,
+    TrendingUp, BarChart3, Eye, EyeOff, Calendar, Users, Settings
 } from 'lucide-react';
 
 interface Props {
@@ -33,6 +34,20 @@ export const Dashboard: React.FC<Props> = ({ data, onResolveIncident, userRole }
     const [healthScore, setHealthScore] = useState(0);
     const isFallero = userRole === 'FALLERO';
     const isAdmin = userRole === 'ADMIN' || userRole === 'PRESIDENTE';
+
+    // --- WIDGET VISIBILITY (stored in localStorage) ---
+    const [widgetVisibility, setWidgetVisibility] = useState<Record<string, boolean>>(() => {
+        try {
+            const saved = localStorage.getItem('merello_dashboard_widgets');
+            return saved ? JSON.parse(saved) : { weekly: true, prediction: true, budget: true, sessions: true };
+        } catch { return { weekly: true, prediction: true, budget: true, sessions: true }; }
+    });
+    const [showWidgetConfig, setShowWidgetConfig] = useState(false);
+    const toggleWidget = (key: string) => {
+        const next = { ...widgetVisibility, [key]: !widgetVisibility[key] };
+        setWidgetVisibility(next);
+        localStorage.setItem('merello_dashboard_widgets', JSON.stringify(next));
+    };
 
     // ... (rest of stats calculation remains unchanged)
 
@@ -103,6 +118,66 @@ export const Dashboard: React.FC<Props> = ({ data, onResolveIncident, userRole }
         return () => clearTimeout(timer);
     }, [stats.score]);
 
+    // --- RESUMEN SEMANAL ---
+    const weeklyStats = useMemo(() => {
+        const now = new Date();
+        const weekStart = new Date(now);
+        weekStart.setDate(now.getDate() - now.getDay() + 1);
+        weekStart.setHours(0, 0, 0, 0);
+        const weekTx = transactions.filter(t => new Date(t.date) >= weekStart);
+        const expenses = weekTx.filter(t => t.type === TransactionType.EXPENSE).reduce((a, t) => a + t.amount, 0);
+        const income = weekTx.filter(t => t.type === TransactionType.INCOME).reduce((a, t) => a + t.amount, 0);
+        const weekIncidents = incidents.filter(i => new Date(i.timestamp) >= weekStart).length;
+        const weekTasks = tasks.filter(t => t.isCompleted).length;
+        return { expenses, income, balance: income - expenses, incidents: weekIncidents, tasksCompleted: weekTasks };
+    }, [transactions, incidents, tasks]);
+
+    // --- PREDICCIÓN DE CONSUMO ---
+    const stockPredictions = useMemo(() => {
+        const now = new Date();
+        return stock
+            .filter(s => s.quantity > 0 && s.minStock > 0)
+            .map(s => {
+                const logs = (data.auditLog || []).filter(l => l.module === 'stock' && l.detail?.includes(s.name) && l.action === 'STOCK_ACTUALIZADO');
+                if (logs.length < 2) return { ...s, daysLeft: null, dailyUsage: 0 };
+                const sorted = logs.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+                const firstLog = new Date(sorted[0].timestamp);
+                const daysSinceFirst = Math.max(1, (now.getTime() - firstLog.getTime()) / (1000 * 60 * 60 * 24));
+                const dailyUsage = logs.length / daysSinceFirst;
+                const daysLeft = dailyUsage > 0 ? Math.round(s.quantity / dailyUsage) : null;
+                return { ...s, daysLeft, dailyUsage: +dailyUsage.toFixed(1) };
+            })
+            .filter(s => s.daysLeft !== null && s.daysLeft < 14)
+            .sort((a, b) => (a.daysLeft || 999) - (b.daysLeft || 999))
+            .slice(0, 6);
+    }, [stock, data.auditLog]);
+
+    // --- PRESUPUESTO REAL vs ESTIMADO ---
+    const budgetComparison = useMemo(() => {
+        return (data.budgetLines || []).map(line => {
+            const actual = transactions
+                .filter(t => t.type === TransactionType.EXPENSE && t.category === line.category)
+                .reduce((a, t) => a + t.amount, 0);
+            const pct = line.estimated > 0 ? Math.round((actual / line.estimated) * 100) : 0;
+            return { category: line.category, estimated: line.estimated, actual, pct };
+        }).filter(l => l.estimated > 0);
+    }, [data.budgetLines, transactions]);
+
+    // --- HISTORIAL DE SESIONES ---
+    const sessionHistory = useMemo(() => {
+        return (data.auditLog || [])
+            .filter(l => l.action === 'CONFIG_CAMBIADA' || l.action === 'LOGÍSTICA_ENTREGA' || l.action === 'GASTO_AÑADIDO' || l.action === 'INGRESO_AÑADIDO' || l.action === 'STOCK_ACTUALIZADO' || l.action === 'PRODUCTO_AÑADIDO')
+            .slice(0, 20)
+            .reduce((acc, log) => {
+                const dateKey = new Date(log.timestamp).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+                const existing = acc.find(a => a.role === log.userRole && a.date === dateKey);
+                if (existing) { existing.actions++; }
+                else { acc.push({ role: log.userRole, date: dateKey, time: new Date(log.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }), actions: 1 }); }
+                return acc;
+            }, [] as { role: string; date: string; time: string; actions: number }[])
+            .slice(0, 8);
+    }, [data.auditLog]);
+
     const getWorkloadConfig = (status: KioskWorkload) => {
         switch (status) {
             case 'ALTA': return {
@@ -153,15 +228,20 @@ export const Dashboard: React.FC<Props> = ({ data, onResolveIncident, userRole }
                     </p>
                 </div>
                 {!isFallero && (
-                    <div className="bg-slate-900 text-white p-4 rounded-3xl shadow-xl flex items-center gap-6 self-stretch min-w-[280px]">
-                        <div className="p-3 bg-emerald-500/20 text-emerald-400 rounded-2xl">
-                            <Wallet size={24} />
-                        </div>
-                        <div>
-                            <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Arqueo Actual Total</p>
-                            <p className="text-2xl font-black tabular-nums tracking-tighter">
-                                {transactions.reduce((acc, t) => t.type === TransactionType.INCOME ? acc + t.amount : acc - t.amount, 0).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
-                            </p>
+                    <div className="flex items-center gap-3">
+                        <button onClick={() => setShowWidgetConfig(!showWidgetConfig)} className={`p-3 rounded-2xl border-2 transition-all ${showWidgetConfig ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-400 border-slate-200 hover:border-indigo-300'}`} title="Personalizar Dashboard">
+                            <Settings size={18} />
+                        </button>
+                        <div className="bg-slate-900 text-white p-4 rounded-3xl shadow-xl flex items-center gap-6 min-w-[260px]">
+                            <div className="p-3 bg-emerald-500/20 text-emerald-400 rounded-2xl">
+                                <Wallet size={24} />
+                            </div>
+                            <div>
+                                <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Arqueo Actual Total</p>
+                                <p className="text-2xl font-black tabular-nums tracking-tighter">
+                                    {transactions.reduce((acc, t) => t.type === TransactionType.INCOME ? acc + t.amount : acc - t.amount, 0).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
+                                </p>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -393,7 +473,132 @@ export const Dashboard: React.FC<Props> = ({ data, onResolveIncident, userRole }
                 </div>
             </div>
 
-            {/* 5. QUICK FINANCE (Mobile Friendly) */}
+            {/* 5. WIDGET CONFIGURATOR */}
+            {showWidgetConfig && !isFallero && (
+                <div className="bg-white rounded-3xl border-2 border-indigo-200 p-5 shadow-sm animate-in slide-in-from-top-2">
+                    <h3 className="text-xs font-black uppercase tracking-widest text-indigo-600 mb-4 flex items-center gap-2"><Settings size={14} /> Personalizar Dashboard</h3>
+                    <div className="flex flex-wrap gap-3">
+                        {[
+                            { key: 'weekly', label: 'Resumen Semanal' },
+                            { key: 'prediction', label: 'Predicción Consumo' },
+                            { key: 'budget', label: 'Presupuesto Real vs Estimado' },
+                            { key: 'sessions', label: 'Historial Sesiones' },
+                        ].map(w => (
+                            <button key={w.key} onClick={() => toggleWidget(w.key)} className={`flex items-center gap-2 px-4 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${widgetVisibility[w.key] ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-400'}`}>
+                                {widgetVisibility[w.key] ? <Eye size={14} /> : <EyeOff size={14} />}
+                                {w.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* 6. RESUMEN SEMANAL */}
+            {!isFallero && widgetVisibility.weekly && (
+                <div className="bg-gradient-to-r from-indigo-600 to-blue-600 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
+                    <div className="absolute -right-6 -top-6 opacity-10"><Calendar size={120} /></div>
+                    <h3 className="text-[10px] font-black uppercase tracking-widest text-blue-200 mb-4 flex items-center gap-2"><Calendar size={14} /> Resumen de esta Semana</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                        <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4">
+                            <p className="text-[9px] font-bold text-blue-200 uppercase">Gastos</p>
+                            <p className="text-xl font-black mt-1">{weeklyStats.expenses.toLocaleString()}€</p>
+                        </div>
+                        <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4">
+                            <p className="text-[9px] font-bold text-blue-200 uppercase">Ingresos</p>
+                            <p className="text-xl font-black mt-1">{weeklyStats.income.toLocaleString()}€</p>
+                        </div>
+                        <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4">
+                            <p className="text-[9px] font-bold text-blue-200 uppercase">Balance</p>
+                            <p className={`text-xl font-black mt-1 ${weeklyStats.balance >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{weeklyStats.balance >= 0 ? '+' : ''}{weeklyStats.balance.toLocaleString()}€</p>
+                        </div>
+                        <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4">
+                            <p className="text-[9px] font-bold text-blue-200 uppercase">Incidencias</p>
+                            <p className="text-xl font-black mt-1">{weeklyStats.incidents}</p>
+                        </div>
+                        <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4">
+                            <p className="text-[9px] font-bold text-blue-200 uppercase">Tareas hechas</p>
+                            <p className="text-xl font-black mt-1">{weeklyStats.tasksCompleted}</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 7. PREDICCIÓN DE CONSUMO */}
+            {!isFallero && widgetVisibility.prediction && stockPredictions.length > 0 && (
+                <div className="bg-white rounded-3xl border-2 border-slate-100 shadow-sm overflow-hidden">
+                    <div className="p-4 border-b border-slate-100 flex justify-between items-center">
+                        <h3 className="text-xs font-black uppercase tracking-widest text-slate-700 flex items-center gap-2"><TrendingUp size={16} className="text-amber-500" /> Predicción de Consumo</h3>
+                        <span className="text-[9px] font-black text-slate-400 uppercase">Basado en historial</span>
+                    </div>
+                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {stockPredictions.map(item => (
+                            <div key={item.id} className={`p-4 rounded-2xl border-2 ${(item.daysLeft || 99) <= 3 ? 'border-rose-200 bg-rose-50' : (item.daysLeft || 99) <= 7 ? 'border-amber-200 bg-amber-50' : 'border-slate-100 bg-slate-50'}`}>
+                                <div className="flex justify-between items-start mb-2">
+                                    <h4 className="font-black text-sm uppercase text-slate-800 truncate">{item.name}</h4>
+                                    <span className={`text-xs font-black px-2 py-1 rounded-full ${(item.daysLeft || 99) <= 3 ? 'bg-rose-500 text-white' : (item.daysLeft || 99) <= 7 ? 'bg-amber-500 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                                        {item.daysLeft}d
+                                    </span>
+                                </div>
+                                <p className="text-[10px] font-bold text-slate-500">Stock actual: {item.quantity} {item.unit}</p>
+                                <p className="text-[10px] font-bold text-slate-400">Uso estimado: ~{item.dailyUsage} {item.unit}/día</p>
+                                <div className="h-1.5 bg-slate-200 rounded-full mt-2">
+                                    <div className={`h-full rounded-full ${(item.daysLeft || 99) <= 3 ? 'bg-rose-500' : (item.daysLeft || 99) <= 7 ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${Math.min(100, ((item.daysLeft || 0) / 14) * 100)}%` }}></div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* 8. PRESUPUESTO REAL vs ESTIMADO */}
+            {!isFallero && widgetVisibility.budget && budgetComparison.length > 0 && (
+                <div className="bg-white rounded-3xl border-2 border-slate-100 shadow-sm overflow-hidden">
+                    <div className="p-4 border-b border-slate-100 flex justify-between items-center">
+                        <h3 className="text-xs font-black uppercase tracking-widest text-slate-700 flex items-center gap-2"><BarChart3 size={16} className="text-indigo-500" /> Presupuesto Real vs Estimado</h3>
+                    </div>
+                    <div className="p-4 space-y-4">
+                        {budgetComparison.map(line => (
+                            <div key={line.category}>
+                                <div className="flex justify-between items-center mb-1.5">
+                                    <span className="text-xs font-black uppercase text-slate-700 truncate">{line.category}</span>
+                                    <span className={`text-xs font-black ${line.pct > 100 ? 'text-rose-600' : line.pct > 80 ? 'text-amber-600' : 'text-emerald-600'}`}>{line.pct}%</span>
+                                </div>
+                                <div className="relative h-6 bg-slate-100 rounded-full overflow-hidden">
+                                    <div className="absolute inset-y-0 left-0 bg-indigo-100 rounded-full" style={{ width: '100%' }}></div>
+                                    <div className={`absolute inset-y-0 left-0 rounded-full transition-all duration-700 ${line.pct > 100 ? 'bg-rose-500' : line.pct > 80 ? 'bg-amber-500' : 'bg-indigo-500'}`} style={{ width: `${Math.min(line.pct, 100)}%` }}></div>
+                                    <div className="absolute inset-0 flex items-center justify-between px-3">
+                                        <span className="text-[9px] font-black text-white drop-shadow-sm">{line.actual.toLocaleString()}€</span>
+                                        <span className="text-[9px] font-black text-slate-400">{line.estimated.toLocaleString()}€</span>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* 9. HISTORIAL DE SESIONES */}
+            {!isFallero && widgetVisibility.sessions && sessionHistory.length > 0 && (
+                <div className="bg-white rounded-3xl border-2 border-slate-100 shadow-sm overflow-hidden">
+                    <div className="p-4 border-b border-slate-100">
+                        <h3 className="text-xs font-black uppercase tracking-widest text-slate-700 flex items-center gap-2"><Users size={16} className="text-emerald-500" /> Actividad por Usuario</h3>
+                    </div>
+                    <div className="p-3 space-y-2">
+                        {sessionHistory.map((s, i) => (
+                            <div key={i} className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl">
+                                <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center text-[10px] font-black shrink-0">{s.role.slice(0, 3)}</div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-black text-slate-800 uppercase">{s.role}</p>
+                                    <p className="text-[10px] font-bold text-slate-400">{s.date} a las {s.time}</p>
+                                </div>
+                                <span className="text-[10px] font-black bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full shrink-0">{s.actions} acciones</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* 10. QUICK FINANCE (Mobile Friendly) */}
             {!isFallero && (
                 <div className="bg-slate-900 rounded-3xl p-6 text-white shadow-lg flex items-center justify-between">
                     <div>
