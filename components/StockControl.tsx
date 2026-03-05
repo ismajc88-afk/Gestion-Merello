@@ -167,9 +167,19 @@ export const StockControl: React.FC<Props> = ({
          usageType: newItem.usageType as any || 'CASAL',
          dailyLimit: newItem.usageType === 'CASAL' ? Number(newItem.dailyLimit) : undefined
       });
-      // Si tiene cantidad y coste, ofrecer crear gasto
+      // Si tiene cantidad y coste, ofrecer crear gasto INMEDIATAMENTE
       if (qty > 0 && cost > 0 && onAutoExpense) {
-         setPendingExpense({ name: newItem.name.toUpperCase(), qty, costPerUnit: cost, category: newItem.category || 'BEBIDAS', subCategory: newItem.subCategory || undefined, unit: newItem.unit || 'u' });
+         const total = +(qty * cost).toFixed(2);
+         const itemName = newItem.name.toUpperCase();
+         const itemCat = newItem.category || 'BEBIDAS';
+         const itemSubCat = newItem.subCategory || undefined;
+         const itemUnit = newItem.unit || 'u';
+         // Usando setPendingExpense para el modal bonito
+         setPendingExpense({ name: itemName, qty, costPerUnit: cost, category: itemCat, subCategory: itemSubCat, unit: itemUnit });
+         // Reset del form pero NO cerrar modal de gasto
+         setNewItem({ name: '', quantity: 0, minStock: 5, unit: units[0] || 'u', category: categories[0] || 'BEBIDAS', subCategory: '', location: 'Almacén', costPerUnit: 0, usageType: 'CASAL', dailyLimit: 0 });
+         setShowAddForm(false);
+         return; // No ejecutar los resets de abajo
       }
       setNewItem({ name: '', quantity: 0, minStock: 5, unit: units[0] || 'u', category: categories[0] || 'BEBIDAS', subCategory: '', location: 'Almacén', costPerUnit: 0, usageType: 'CASAL', dailyLimit: 0 });
       setShowAddForm(false);
