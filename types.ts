@@ -114,6 +114,7 @@ export interface AppConfig {
   year: number;
   startDate: string;
   endDate: string;
+  projectionEndDate?: string;
   pins: Record<UserRole, string>;
   budgetCategories: string[];
   barPrices: BarPrice[];

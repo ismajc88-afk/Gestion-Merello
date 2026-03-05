@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { AppData, TransactionType, Transaction, UserRole, SubBudgetLine } from '../types';
+import { AppData, AppConfig, TransactionType, Transaction, UserRole, SubBudgetLine } from '../types';
 import {
    PieChart as PieIcon, TrendingUp, ChevronRight, X,
    DollarSign, Activity, Utensils, Wine, Package,
@@ -24,9 +24,10 @@ interface Props {
    onAddLine: (category: string, amount: number) => void;
    onDeleteLine: (category: string) => void;
    onUpdateSubLines: (category: string, subLines: SubBudgetLine[]) => void;
+   onUpdateConfig: (config: AppConfig) => void;
 }
 
-export const InventoryManager: React.FC<Props> = ({ data, userRole, onUpdateBudget, onUpdateLimit, onAddLine, onDeleteLine, onUpdateSubLines }) => {
+export const InventoryManager: React.FC<Props> = ({ data, userRole, onUpdateBudget, onUpdateLimit, onAddLine, onDeleteLine, onUpdateSubLines, onUpdateConfig }) => {
    const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
    const [isEditingLimit, setIsEditingLimit] = useState(false);
    const [showAddForm, setShowAddForm] = useState(false);
@@ -86,12 +87,14 @@ export const InventoryManager: React.FC<Props> = ({ data, userRole, onUpdateBudg
    const burnHealth = burnRate > maxBurnRate * 1.15 ? 'CRITICAL' : burnRate > maxBurnRate ? 'WARNING' : 'HEALTHY';
 
    // --- PROYECCIÓN FINANCIERA (RUNWAY) ---
+   const projectionEndDate = data.appConfig.projectionEndDate || data.appConfig.endDate;
+
    const projection = useMemo(() => {
       const today = new Date();
-      const endDate = new Date(data.appConfig.endDate);
+      const endDate = new Date(projectionEndDate);
       const msPerDay = 1000 * 60 * 60 * 24;
 
-      // Días que faltan hasta el fin de fiesta oficial
+      // Días que faltan hasta el fin de fiesta oficial (o límite proyectado)
       const daysUntilEnd = Math.ceil((endDate.getTime() - today.getTime()) / msPerDay);
 
       // Evitar división por cero
@@ -116,7 +119,7 @@ export const InventoryManager: React.FC<Props> = ({ data, userRole, onUpdateBudg
          isBankruptBeforeEnd,
          daysUntilEnd: Math.max(0, daysUntilEnd)
       };
-   }, [remainingBudget, burnRate, data.appConfig.endDate]);
+   }, [remainingBudget, burnRate, projectionEndDate]);
 
 
    // Datos para Gráfico de Tendencia
@@ -310,10 +313,23 @@ export const InventoryManager: React.FC<Props> = ({ data, userRole, onUpdateBudg
             <div className="absolute top-0 right-0 p-12 opacity-10"><Telescope size={300} className="-rotate-12" /></div>
 
             <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8">
-               <div>
-                  <div className="flex items-center gap-3 mb-4">
-                     <div className="p-3 bg-white/20 backdrop-blur-sm rounded-2xl"><CalendarClock size={24} /></div>
-                     <span className="text-[10px] font-black uppercase tracking-[0.4em] opacity-80">Predicción IA • Algoritmo de Gasto</span>
+               <div className="flex-1">
+                  <div className="flex flex-col md:flex-row items-start md:items-center gap-3 mb-4">
+                     <div className="flex items-center gap-3">
+                        <div className="p-3 bg-white/20 backdrop-blur-sm rounded-2xl"><CalendarClock size={24} /></div>
+                        <span className="text-[10px] font-black uppercase tracking-[0.4em] opacity-80">Predicción IA • Algoritmo de Gasto</span>
+                     </div>
+                     {canEdit && (
+                        <div className="flex items-center gap-2 mt-2 md:mt-0 bg-black/20 px-3 py-1.5 rounded-full border border-white/10 hover:bg-black/40 transition-colors">
+                           <span className="text-[9px] font-bold uppercase tracking-widest opacity-80">🔥 Horizonte:</span>
+                           <input
+                              type="date"
+                              value={data.appConfig.projectionEndDate || data.appConfig.endDate}
+                              onChange={(e) => onUpdateConfig({ ...data.appConfig, projectionEndDate: e.target.value })}
+                              className="bg-transparent text-[10px] font-black uppercase outline-none cursor-pointer text-white"
+                           />
+                        </div>
+                     )}
                   </div>
                   <h3 className="text-3xl md:text-5xl font-black tracking-tighter leading-tight max-w-2xl">
                      {projection.isBankruptBeforeEnd
@@ -323,7 +339,7 @@ export const InventoryManager: React.FC<Props> = ({ data, userRole, onUpdateBudg
                   <p className="text-base md:text-lg opacity-80 mt-4 max-w-xl font-medium">
                      {projection.isBankruptBeforeEnd
                         ? `Al ritmo actual (${burnRate.toFixed(0)}€/día), te quedarás sin fondos el día ${projection.bankruptcyDate.toLocaleDateString()}. Faltan ${projection.daysUntilEnd} días de fiesta.`
-                        : `Estás gestionando bien. Llegarás al final de la fiesta con dinero de sobra si mantienes este ritmo.`}
+                        : `Estás gestionando bien. Llegarás a la fecha objetivo con dinero de sobra si mantienes este ritmo.`}
                   </p>
                </div>
 

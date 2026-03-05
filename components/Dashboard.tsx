@@ -216,20 +216,20 @@ export const Dashboard: React.FC<Props> = ({ data, onResolveIncident, userRole }
             {/* 1. HEADER */}
             <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-6">
                 <div>
-                    <h1 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tight uppercase italic flex items-center gap-3">
+                    <h1 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tight uppercase italic flex items-center gap-3 relative z-10">
                         {isFallero ? 'Mi Zona' : 'Centro de Mando'}
                         <div className="hidden md:flex items-center text-[10px] font-black uppercase tracking-widest bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full not-italic">
                             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse mr-2"></div>
                             Sistema Operativo
                         </div>
                     </h1>
-                    <p className="text-xs md:text-sm font-bold text-slate-400 uppercase tracking-widest mt-1">
+                    <p className="text-xs md:text-sm font-bold text-slate-400 uppercase tracking-widest mt-1 relative z-10">
                         Estado de la Falla: <span className="text-emerald-600">En Marcha</span>
                     </p>
                 </div>
                 {!isFallero && (
-                    <div className="flex items-center gap-3">
-                        <button onClick={() => setShowWidgetConfig(!showWidgetConfig)} className={`p-3 rounded-2xl border-2 transition-all ${showWidgetConfig ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-400 border-slate-200 hover:border-indigo-300'}`} title="Personalizar Dashboard">
+                    <div className="flex flex-col md:flex-row items-end md:items-center gap-3 relative z-20">
+                        <button onClick={() => setShowWidgetConfig(!showWidgetConfig)} className={`p-3 rounded-2xl border-2 transition-all cursor-pointer shadow-sm active:scale-95 ${showWidgetConfig ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-600/30' : 'bg-white text-slate-400 border-slate-200 hover:border-indigo-300 hover:text-indigo-500'}`} title="Personalizar Dashboard">
                             <Settings size={18} />
                         </button>
                         <div className="bg-slate-900 text-white p-4 rounded-3xl shadow-xl flex items-center gap-6 min-w-[260px]">
