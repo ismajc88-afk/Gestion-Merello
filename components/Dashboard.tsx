@@ -7,7 +7,8 @@ import {
 import {
     Wallet, Clock, Utensils, Beer, AlertTriangle, Check,
     Siren, Home, Flame, BatteryMedium, BatteryFull, Package,
-    TrendingUp, BarChart3, Eye, EyeOff, Calendar, Users, Settings
+    TrendingUp, BarChart3, Eye, EyeOff, Calendar, Users, Settings,
+    ArrowUpRight, ArrowDownRight, Percent, PiggyBank, CreditCard
 } from 'lucide-react';
 
 interface Props {
@@ -28,6 +29,7 @@ export const Dashboard: React.FC<Props> = ({ data, onResolveIncident, userRole }
         mealEvents = [],
         incidents = [],
         stock = [],
+        barSessions = [],
         kioskStatus
     } = data;
 
@@ -39,8 +41,8 @@ export const Dashboard: React.FC<Props> = ({ data, onResolveIncident, userRole }
     const [widgetVisibility, setWidgetVisibility] = useState<Record<string, boolean>>(() => {
         try {
             const saved = localStorage.getItem('merello_dashboard_widgets');
-            return saved ? JSON.parse(saved) : { weekly: true, prediction: true, budget: true, sessions: true };
-        } catch { return { weekly: true, prediction: true, budget: true, sessions: true }; }
+            return saved ? JSON.parse(saved) : { weekly: true, prediction: true, budget: true, sessions: true, kioskProfit: true, cashFlow: true };
+        } catch { return { weekly: true, prediction: true, budget: true, sessions: true, kioskProfit: true, cashFlow: true }; }
     });
     const [showWidgetConfig, setShowWidgetConfig] = useState(false);
     const toggleWidget = (key: string) => {
@@ -131,6 +133,33 @@ export const Dashboard: React.FC<Props> = ({ data, onResolveIncident, userRole }
         const weekTasks = tasks.filter(t => t.isCompleted).length;
         return { expenses, income, balance: income - expenses, incidents: weekIncidents, tasksCompleted: weekTasks };
     }, [transactions, incidents, tasks]);
+
+    // --- RENDIMIENTO KIOSKO (MÁRGENES BARRA) ---
+    const kioskProfitStats = useMemo(() => {
+        const totalRevenue = barSessions.reduce((acc, s) => acc + (s.revenue || 0), 0);
+        const barExpenses = transactions
+            .filter(t => t.type === TransactionType.EXPENSE && t.isBarInvestment)
+            .reduce((acc, t) => acc + t.amount, 0);
+
+        const netProfit = totalRevenue - barExpenses;
+        const roi = barExpenses > 0 ? (netProfit / barExpenses) * 100 : (totalRevenue > 0 ? 100 : 0);
+        const margin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+
+        return { totalRevenue, barExpenses, netProfit, roi, margin };
+    }, [barSessions, transactions]);
+
+    // --- FLUJO RECIENTE DE TESORERÍA ---
+    const recentCashFlow = useMemo(() => {
+        return [...transactions]
+            .sort((a, b) => {
+                // Primero por fecha, luego por timestamp si existe para desempatar, o ID
+                const dateA = new Date(a.date).getTime();
+                const dateB = new Date(b.date).getTime();
+                if (dateA === dateB) return parseInt(b.id) - parseInt(a.id);
+                return dateB - dateA;
+            })
+            .slice(0, 5);
+    }, [transactions]);
 
     // --- PREDICCIÓN DE CONSUMO ---
     const stockPredictions = useMemo(() => {
@@ -483,6 +512,8 @@ export const Dashboard: React.FC<Props> = ({ data, onResolveIncident, userRole }
                             { key: 'prediction', label: 'Predicción Consumo' },
                             { key: 'budget', label: 'Presupuesto Real vs Estimado' },
                             { key: 'sessions', label: 'Historial Sesiones' },
+                            { key: 'kioskProfit', label: 'Rendimiento Kiosko' },
+                            { key: 'cashFlow', label: 'Flujo de Tesorería' },
                         ].map(w => (
                             <button key={w.key} onClick={() => toggleWidget(w.key)} className={`flex items-center gap-2 px-4 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${widgetVisibility[w.key] ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-400'}`}>
                                 {widgetVisibility[w.key] ? <Eye size={14} /> : <EyeOff size={14} />}
