@@ -18,9 +18,16 @@ export enum ShiftTime {
 
 export type UserRole = 'ADMIN' | 'PRESIDENTE' | 'TESORERIA' | 'LOGISTICA' | 'BARRA' | 'CAMARERO' | 'CAJERO' | 'FALLERO' | 'KIOSKO_VENTA' | 'KIOSKO_CASAL';
 
+export interface BarPriceRecipeItem {
+  stockItemId: string;
+  stockItemName: string;
+  quantity: number;
+}
+
 export interface BarPrice {
   name: string;
   price: number;
+  recipe?: BarPriceRecipeItem[];
 }
 
 export interface ModuleDefinition {

@@ -8,7 +8,7 @@ import {
    Users, Wallet, Truck, Beer, Plus, Tag, Clock,
    DollarSign, ChevronRight, X, ShieldCheck, Box, Ruler, Calendar, MapPin,
    ClipboardList, Wifi, Monitor, Activity, Cloud, UploadCloud, Ticket, Home, Calculator,
-   ShoppingBag, List, Shield
+   ShoppingBag, List, Shield, FlaskConical, Beaker
 } from 'lucide-react';
 import { SyncModules } from './SyncModules';
 import { RolePermissionsPanel } from './RolePermissionsPanel';
@@ -38,6 +38,10 @@ export const AdminControlPanel: React.FC<Props> = ({ data, onUpdateConfig, onRes
 
    // New Ticket Form State
    const [newTicket, setNewTicket] = useState({ name: '', price: '1.00', category: 'ALCOHOL' });
+
+   // Recipe Engine State (Escandallos)
+   const [editingRecipeFor, setEditingRecipeFor] = useState<number | null>(null);
+   const [recipeBuilderItem, setRecipeBuilderItem] = useState<{ stockItemId: string, quantity: string }>({ stockItemId: '', quantity: '1' });
 
    // Backups State
    const [backups, setBackups] = useState<any[]>([]);
@@ -176,6 +180,51 @@ export const AdminControlPanel: React.FC<Props> = ({ data, onUpdateConfig, onRes
       }
 
       setNewTicket({ name: '', price: '', category: 'ALCOHOL' });
+   };
+
+   // --- RECIPE BUILDER ---
+   const currentEditingPrice = editingRecipeFor !== null ? config.barPrices[editingRecipeFor] : null;
+
+   const getRecipeCost = (recipe: BarPrice['recipe']) => {
+      if (!recipe) return 0;
+      return recipe.reduce((acc: number, r: NonNullable<BarPrice['recipe']>[number]) => {
+         const stockItem = data.stock.find(s => s.id === r.stockItemId);
+         return acc + (stockItem ? stockItem.costPerUnit * r.quantity : 0);
+      }, 0);
+   };
+
+   const handleAddRecipeItem = () => {
+      if (editingRecipeFor === null || !currentEditingPrice || !recipeBuilderItem.stockItemId) return;
+
+      const stockRef = data.stock.find(s => s.id === recipeBuilderItem.stockItemId);
+      if (!stockRef) return;
+
+      const qty = parseFloat(recipeBuilderItem.quantity) || 0;
+      if (qty <= 0) return;
+
+      const currentRecipe = currentEditingPrice.recipe || [];
+      const newPrices = [...config.barPrices];
+
+      // If item already in recipe, update qty, else add
+      const existingIdx = currentRecipe.findIndex(r => r.stockItemId === stockRef.id);
+      let newRecipe = [...currentRecipe];
+      if (existingIdx >= 0) {
+         newRecipe[existingIdx] = { ...newRecipe[existingIdx], quantity: newRecipe[existingIdx].quantity + qty };
+      } else {
+         newRecipe.push({ stockItemId: stockRef.id, stockItemName: stockRef.name, quantity: qty });
+      }
+
+      newPrices[editingRecipeFor] = { ...currentEditingPrice, recipe: newRecipe };
+      setConfig({ ...config, barPrices: newPrices });
+      setRecipeBuilderItem({ stockItemId: '', quantity: '1' });
+   };
+
+   const handleRemoveRecipeItem = (stockItemId: string) => {
+      if (editingRecipeFor === null || !currentEditingPrice) return;
+      const newPrices = [...config.barPrices];
+      const newRecipe = (currentEditingPrice.recipe || []).filter(r => r.stockItemId !== stockItemId);
+      newPrices[editingRecipeFor] = { ...currentEditingPrice, recipe: newRecipe };
+      setConfig({ ...config, barPrices: newPrices });
    };
 
    const securityRoles: { id: UserRole, label: string, icon: any }[] = [
@@ -358,9 +407,112 @@ export const AdminControlPanel: React.FC<Props> = ({ data, onUpdateConfig, onRes
                                  />
                                  <span className="font-bold text-slate-300 text-xs">€</span>
                               </div>
-                              <button onClick={() => removePrice(item)} className="p-3 text-slate-200 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"><Trash2 size={16} /></button>
+                              <div className="flex bg-slate-100 rounded-xl overflow-hidden shadow-sm border border-slate-200 ml-2">
+                                 <button onClick={() => setEditingRecipeFor(i)} className={`p-3 flex items-center gap-2 hover:bg-indigo-50 hover:text-indigo-600 transition-all ${item.recipe && item.recipe.length > 0 ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400'}`}>
+                                    <FlaskConical size={16} />
+                                 </button>
+                                 <button onClick={() => removePrice(item)} className="p-3 text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all border-l border-slate-200">
+                                    <Trash2 size={16} />
+                                 </button>
+                              </div>
                            </div>
                         ))}
+                     </div>
+                  </div>
+               )}
+
+               {/* MODAL ESCANDALLO (RECIPE BUILDER) */}
+               {editingRecipeFor !== null && currentEditingPrice && (
+                  <div className="fixed inset-0 z-[200] bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-4">
+                     <div className="bg-white w-full max-w-2xl rounded-[48px] shadow-2xl p-8 md:p-12 animate-in zoom-in-95 relative border-2 border-indigo-100">
+                        <button onClick={() => setEditingRecipeFor(null)} className="absolute top-8 right-8 p-3 bg-slate-100 hover:bg-slate-200 rounded-full transition-all"><X size={20} /></button>
+
+                        <div className="flex items-center gap-4 mb-8">
+                           <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center border border-indigo-100">
+                              <Beaker size={32} className="text-indigo-600" />
+                           </div>
+                           <div>
+                              <p className="text-[10px] font-black tracking-widest text-indigo-400 uppercase">Calculadora de Escandallo</p>
+                              <h3 className="text-3xl font-black text-slate-900 uppercase italic tracking-tighter">{currentEditingPrice.name}</h3>
+                           </div>
+                        </div>
+
+                        {/* KPIS RENTABILIDAD */}
+                        <div className="grid grid-cols-3 gap-4 mb-8">
+                           <div className="bg-slate-50 p-6 rounded-[24px] text-center border border-slate-100 shadow-sm">
+                              <p className="text-[9px] font-black text-slate-400 uppercase mb-1">PVP TPV</p>
+                              <p className="text-2xl font-black text-slate-900">{currentEditingPrice.price.toFixed(2)}€</p>
+                           </div>
+                           <div className="bg-rose-50/50 p-6 rounded-[24px] text-center border border-rose-100 shadow-sm">
+                              <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Coste Stock</p>
+                              <p className="text-2xl font-black text-rose-500">{getRecipeCost(currentEditingPrice.recipe).toFixed(2)}€</p>
+                           </div>
+                           <div className="bg-emerald-50/50 p-6 rounded-[24px] text-center border border-emerald-100 shadow-sm relative overflow-hidden">
+                              <p className="text-[9px] font-black text-emerald-600/60 uppercase mb-1">Beneficio</p>
+                              <p className="text-2xl font-black text-emerald-600 relative z-10">
+                                 {(currentEditingPrice.price - getRecipeCost(currentEditingPrice.recipe)).toFixed(2)}€
+                              </p>
+                              <div className="absolute right-0 bottom-0 text-emerald-600/10 font-black text-4xl -mr-2 -mb-2">
+                                 {currentEditingPrice.price > 0 ? (((currentEditingPrice.price - getRecipeCost(currentEditingPrice.recipe)) / currentEditingPrice.price) * 100).toFixed(0) : 0}%
+                              </div>
+                           </div>
+                        </div>
+
+                        {/* AÑADIR STOCK */}
+                        <div className="flex flex-col md:flex-row gap-3 mb-6 bg-indigo-50 p-3 rounded-[24px] border border-indigo-100">
+                           <select
+                              value={recipeBuilderItem.stockItemId}
+                              onChange={e => setRecipeBuilderItem({ ...recipeBuilderItem, stockItemId: e.target.value })}
+                              className="flex-1 p-4 bg-white rounded-xl font-bold text-xs uppercase outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                           >
+                              <option value="">Seleccionar producto de stock...</option>
+                              {data.stock.filter(s => s.usageType === 'VENTA').map(s => (
+                                 <option key={s.id} value={s.id}>{s.name} ({s.costPerUnit}€ / {s.unit})</option>
+                              ))}
+                           </select>
+                           <div className="flex gap-2">
+                              <input
+                                 type="number" step="0.01"
+                                 value={recipeBuilderItem.quantity}
+                                 onChange={e => setRecipeBuilderItem({ ...recipeBuilderItem, quantity: e.target.value })}
+                                 className="w-24 p-4 bg-white rounded-xl font-black text-center text-indigo-600 outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                                 placeholder="Cant."
+                              />
+                              <button onClick={handleAddRecipeItem} disabled={!recipeBuilderItem.stockItemId} className="px-6 bg-indigo-600 text-white rounded-xl font-black shadow-md hover:bg-slate-900 active:scale-95 transition-all disabled:opacity-50">
+                                 <Plus size={20} />
+                              </button>
+                           </div>
+                        </div>
+
+                        {/* RECIPE LIST */}
+                        <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar border-t border-slate-100 pt-4">
+                           {(!currentEditingPrice.recipe || currentEditingPrice.recipe.length === 0) ? (
+                              <p className="text-center py-6 text-[10px] font-black uppercase tracking-widest text-slate-300">Sin ingredientes asignados.<br /> Todo el PVP es Beneficio Puro (100%).</p>
+                           ) : (
+                              currentEditingPrice.recipe.map(r => {
+                                 const stockItem = data.stock.find(s => s.id === r.stockItemId);
+                                 const cost = stockItem ? stockItem.costPerUnit * r.quantity : 0;
+                                 return (
+                                    <div key={r.stockItemId} className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-100 group hover:shadow-md transition-all">
+                                       <div>
+                                          <p className="text-xs font-black uppercase text-slate-800">{r.stockItemName}</p>
+                                          <p className="text-[10px] font-bold text-slate-400">{r.quantity} {stockItem?.unit || 'u'} a {stockItem?.costPerUnit || 0}€/{stockItem?.unit || 'u'}</p>
+                                       </div>
+                                       <div className="flex items-center gap-4">
+                                          <span className="text-sm font-black text-rose-500">{cost.toFixed(2)}€</span>
+                                          <button onClick={() => handleRemoveRecipeItem(r.stockItemId)} className="p-2 text-slate-300 hover:bg-rose-100 hover:text-rose-600 rounded-xl transition-colors">
+                                             <Trash2 size={16} />
+                                          </button>
+                                       </div>
+                                    </div>
+                                 );
+                              })
+                           )}
+                        </div>
+
+                        <button onClick={() => setEditingRecipeFor(null)} className="w-full mt-6 py-5 bg-slate-900 text-white rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl hover:bg-slate-800 active:scale-[0.98] transition-all">
+                           Cerrar Calculadora
+                        </button>
                      </div>
                   </div>
                )}
