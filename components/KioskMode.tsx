@@ -83,6 +83,10 @@ export const KioskMode: React.FC<KioskModeProps> = ({
     const [restockUrgency, setRestockUrgency] = useState<'NORMAL' | 'URGENT'>('NORMAL');
     const [justification, setJustification] = useState(''); // Para peticiones que excedan cupo
 
+    // Change Request State (Para Cajeros)
+    const [showChangeRequestModal, setShowChangeRequestModal] = useState(false);
+    const [changeRequestAmount, setChangeRequestAmount] = useState<number | string>('');
+
     // --- EFECTOS ---
     useEffect(() => {
         onUpdateWorkload(initialMode, workload);
@@ -165,7 +169,6 @@ export const KioskMode: React.FC<KioskModeProps> = ({
         return acc + (price * (count as number));
     }, 0);
 
-    // --- HANDLERS STOCK ---
     const handleIceRequest = () => {
         if (isDuplicate('ICE_REQUEST')) {
             toast.warning('Ya has pedido hielo hace menos de 30 segundos');
@@ -173,6 +176,17 @@ export const KioskMode: React.FC<KioskModeProps> = ({
         }
         onCreateIncident('Necesitamos Hielo Urgente', 'URGENT', undefined, 1, initialMode);
         alert("❄️ AVISO DE HIELO ENVIADO");
+    };
+
+    const handleChangeRequest = (amount: number | string) => {
+        if (isDuplicate('CHANGE_REQUEST')) {
+            toast.warning('Ya has pedido cambio hace menos de 30 segundos');
+            return;
+        }
+        onCreateIncident(`🚨 NECESITAMOS CAMBIO: ${amount}€`, 'URGENT', undefined, 1, initialMode);
+        setShowChangeRequestModal(false);
+        setChangeRequestAmount('');
+        toast.success(`Aviso de cambio de ${amount}€ enviado a Coordinación`);
     };
 
     const confirmRestock = () => {
@@ -320,6 +334,20 @@ export const KioskMode: React.FC<KioskModeProps> = ({
                                     {comboDiscount > 0 && <span className="text-xs text-slate-500 line-through mr-2">{cartTotal.toFixed(2)}€</span>}
                                     <span className="text-3xl md:text-4xl font-black">{finalTotal.toFixed(2)}€</span>
                                 </div>
+                            </div>
+                            <div className="flex gap-2 mb-4">
+                                <button
+                                    onClick={() => setShowChangeRequestModal(true)}
+                                    className="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-slate-900 rounded-xl font-black uppercase text-xs md:text-sm flex items-center justify-center gap-2 transition-colors border-b-4 border-amber-700 active:translate-y-1 active:border-b-0"
+                                >
+                                    <AlertTriangle size={18} /> Pedir Cambio
+                                </button>
+                                <button
+                                    onClick={() => setCart([])}
+                                    className="flex-1 py-3 bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 rounded-xl font-bold uppercase text-xs md:text-sm flex items-center justify-center gap-2 transition-colors"
+                                >
+                                    <X size={18} /> Cancelar
+                                </button>
                             </div>
                             <button onClick={handleCheckout} disabled={cart.length === 0} className="w-full py-4 bg-emerald-500 text-slate-900 rounded-xl font-black uppercase text-base md:text-lg">Cobrar</button>
                         </div>
@@ -960,6 +988,62 @@ export const KioskMode: React.FC<KioskModeProps> = ({
                                     );
                                 })
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* MODAL PEDIR CAMBIO/SUELTO */}
+            {showChangeRequestModal && (
+                <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
+                    <div className="bg-white p-6 md:p-8 rounded-[40px] w-full max-w-sm shadow-2xl animate-in zoom-in-95 border-4 border-amber-500">
+                        <div className="text-center mb-6">
+                            <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4 border-2 border-amber-300 transform -rotate-6">
+                                <AlertTriangle size={32} className="text-amber-600" />
+                            </div>
+                            <h3 className="text-2xl font-black uppercase tracking-tighter">Necesitamos Cambio</h3>
+                            <p className="text-slate-500 text-sm mt-1">¿Cuánto suelto necesitas en caja?</p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 mb-4">
+                            {[20, 50, 100, 200].map(amt => (
+                                <button
+                                    key={amt}
+                                    onClick={() => setChangeRequestAmount(amt)}
+                                    className={`py-4 rounded-xl font-black text-xl border-2 transition-all ${changeRequestAmount === amt
+                                        ? 'bg-amber-500 border-amber-600 text-slate-900'
+                                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-amber-400'
+                                        }`}
+                                >
+                                    {amt}€
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="mb-6">
+                            <label className="text-xs font-bold text-slate-400 uppercase ml-2 mb-1 block">Otra cantidad (€)</label>
+                            <input
+                                type="number"
+                                placeholder="Escribe cantidad..."
+                                value={changeRequestAmount}
+                                onChange={e => setChangeRequestAmount(Number(e.target.value) || '')}
+                                className="w-full bg-slate-50 p-4 border-2 border-slate-200 rounded-xl font-black text-center text-xl outline-none focus:border-amber-500"
+                            />
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowChangeRequestModal(false)}
+                                className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold uppercase text-sm"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={() => handleChangeRequest(changeRequestAmount)}
+                                disabled={!changeRequestAmount}
+                                className="flex-1 py-4 bg-amber-500 hover:bg-amber-600 text-slate-900 rounded-xl font-black uppercase text-sm disabled:opacity-50 border-b-4 border-amber-700 active:border-b-0 active:translate-y-1"
+                            >
+                                Enviar Aviso
+                            </button>
                         </div>
                     </div>
                 </div>

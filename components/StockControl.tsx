@@ -26,11 +26,12 @@ interface Props {
    onDelete: (id: string) => void;
    onAddShoppingItems?: (items: { name: string; quantity: number; unit: string; estimatedCost?: number; notes?: string }[]) => void;
    onAutoExpense?: (expense: { description: string; amount: number; category: string; subCategory?: string }) => void;
+   onAutoIncome?: (income: { description: string; amount: number; category: string; subCategory?: string }) => void;
 }
 
 export const StockControl: React.FC<Props> = ({
    items, categories, categoryDefs = PREDEFINED_STOCK_CATEGORIES, units, barSessions = [], incidents = [],
-   onUpdateStock, onAddItem, onDelete, onUpdateItem, onAddShoppingItems, onAutoExpense
+   onUpdateStock, onAddItem, onDelete, onUpdateItem, onAddShoppingItems, onAutoExpense, onAutoIncome
 }) => {
    const [filterCat, setFilterCat] = useState<string>('ALL');
    const [filterUsage, setFilterUsage] = useState<'ALL' | 'CASAL' | 'VENTA'>('ALL');
@@ -47,6 +48,8 @@ export const StockControl: React.FC<Props> = ({
 
    // Estado para el popup de gasto automático
    const [pendingExpense, setPendingExpense] = useState<{ name: string; qty: number; costPerUnit: number; category: string; subCategory?: string; unit: string } | null>(null);
+   // Estado para el popup de INGRESO automático (devolución)
+   const [pendingIncome, setPendingIncome] = useState<{ name: string; qty: number; costPerUnit: number; category: string; subCategory?: string; unit: string } | null>(null);
 
    const [newItem, setNewItem] = useState<Partial<StockItem>>({
       name: '', quantity: 0, minStock: 5, unit: units[0] || 'u', category: categories[0] || 'BEBIDAS', subCategory: '', location: 'Almacén', costPerUnit: 0, usageType: 'CASAL', dailyLimit: 0
@@ -193,6 +196,10 @@ export const StockControl: React.FC<Props> = ({
          // Si se subió la cantidad y tiene coste, ofrecer crear gasto
          if (qtyAdded > 0 && editingItem.costPerUnit > 0 && onAutoExpense) {
             setPendingExpense({ name: editingItem.name, qty: qtyAdded, costPerUnit: editingItem.costPerUnit, category: editingItem.category || 'STOCK', subCategory: editingItem.subCategory || undefined, unit: editingItem.unit });
+         }
+         // Si se REDUJO la cantidad y tiene coste, ofrecer crear INGRESO (devolución)
+         if (qtyAdded < 0 && editingItem.costPerUnit > 0 && onAutoIncome) {
+            setPendingIncome({ name: editingItem.name, qty: Math.abs(qtyAdded), costPerUnit: editingItem.costPerUnit, category: editingItem.category || 'STOCK', subCategory: editingItem.subCategory || undefined, unit: editingItem.unit });
          }
          setEditingItem(null);
       }
@@ -798,9 +805,9 @@ export const StockControl: React.FC<Props> = ({
                            });
                            setPendingExpense(null);
                         }}
-                        className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black uppercase text-sm transition-colors"
+                        className="w-full py-4 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl font-black uppercase text-sm transition-colors"
                      >
-                        ✅ Sí, registrar gasto
+                        ✅ Sí, registrar GASTO
                      </button>
                      <button
                         onClick={() => setPendingExpense(null)}
@@ -813,6 +820,62 @@ export const StockControl: React.FC<Props> = ({
             </div>
          )}
 
+         {/* MODAL: INGRESO AUTOMÁTICO POR DEVOLUCIÓN DE STOCK */}
+         {pendingIncome && (
+            <div className="fixed inset-0 z-[500] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+               <div className="bg-white w-full max-w-sm rounded-[32px] p-6 shadow-[0_20px_60px_-15px_rgba(16,185,129,0.3)]">
+                  <div className="text-center mb-4">
+                     <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <BadgeEuro size={28} className="text-emerald-600" />
+                     </div>
+                     <h3 className="text-lg font-black text-slate-900 uppercase">¿Devolución?</h3>
+                     <p className="text-xs text-slate-500 mt-1">Has restado stock que tiene coste. ¿Lo has devuelto al proveedor para recuperar dinero?</p>
+                  </div>
+
+                  <div className="bg-emerald-50 rounded-2xl p-4 space-y-2 mb-4 border border-emerald-100">
+                     <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Producto</span>
+                        <span className="font-black text-slate-900">{pendingIncome.name}</span>
+                     </div>
+                     <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Ud. Restadas</span>
+                        <span className="font-bold">{pendingIncome.qty} {pendingIncome.unit}</span>
+                     </div>
+                     <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Coste unitario</span>
+                        <span className="font-bold">{pendingIncome.costPerUnit.toFixed(2)}€</span>
+                     </div>
+                     <div className="border-t border-emerald-200 pt-2 flex justify-between">
+                        <span className="text-sm font-black text-emerald-800 uppercase">Total a Ingresar</span>
+                        <span className="text-2xl font-black text-emerald-600">{(pendingIncome.qty * pendingIncome.costPerUnit).toFixed(2)}€</span>
+                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                     <button
+                        onClick={() => {
+                           onAutoIncome?.({
+                              description: `Devolución Proveedor: ${pendingIncome.name} x${pendingIncome.qty}`,
+                              amount: +(pendingIncome.qty * pendingIncome.costPerUnit).toFixed(2),
+                              category: pendingIncome.category,
+                              subCategory: pendingIncome.subCategory
+                           });
+                           setPendingIncome(null);
+                        }}
+                        className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black uppercase text-sm transition-colors shadow-lg shadow-emerald-600/20"
+                     >
+                        ✅ SÍ, REGISTRAR INGRESO
+                     </button>
+                     <button
+                        onClick={() => setPendingIncome(null)}
+                        className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-2xl font-bold text-xs uppercase transition-colors"
+                     >
+                        No, rotura / consumo
+                     </button>
+                  </div>
+               </div>
+            </div>
+         )}
       </div>
    );
 };
