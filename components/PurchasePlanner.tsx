@@ -418,6 +418,10 @@ export const PurchasePlanner: React.FC<Props> = ({ catalog, onUpdateCatalog, onC
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Estimado</span>
                     <span className="text-sm font-black text-slate-900">{activePlanTotal.toFixed(2)}€</span>
                 </div>
+
+                <button onClick={() => setIsScannerOpen(true)} className="w-full flex items-center justify-center gap-2 py-3 bg-indigo-600 text-white rounded-xl font-black text-[11px] uppercase tracking-widest shadow-md shadow-indigo-500/30 active:scale-95 transition-transform">
+                    <ScanLine size={16} /> Escanear Factura con IA
+                </button>
             </div>
 
             <div className="flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden">
