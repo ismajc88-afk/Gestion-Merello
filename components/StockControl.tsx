@@ -7,7 +7,7 @@ import {
    BadgeEuro, Save, ShoppingBag, User, Timer,
    BarChart3, TrendingUp, Clock, Zap, AlertTriangle, ArrowRight,
    MoreHorizontal, ChevronDown, Filter, LayoutGrid, List, ShieldAlert,
-   Flame, Calendar, Activity
+   Flame, Calendar, Activity, Repeat
 } from 'lucide-react';
 import {
    AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar
@@ -50,6 +50,11 @@ export const StockControl: React.FC<Props> = ({
    const [pendingExpense, setPendingExpense] = useState<{ name: string; qty: number; costPerUnit: number; category: string; subCategory?: string; unit: string } | null>(null);
    // Estado para el popup de INGRESO automático (devolución)
    const [pendingIncome, setPendingIncome] = useState<{ name: string; qty: number; costPerUnit: number; category: string; subCategory?: string; unit: string } | null>(null);
+
+   // Estado para el Modal de Trasvase de Stock
+   const [transferSourceItem, setTransferSourceItem] = useState<StockItem | null>(null);
+   const [transferDestId, setTransferDestId] = useState<string>('');
+   const [transferQty, setTransferQty] = useState<number>(1);
 
    const [newItem, setNewItem] = useState<Partial<StockItem>>({
       name: '', quantity: 0, minStock: 5, unit: units[0] || 'u', category: categories[0] || 'BEBIDAS', subCategory: '', location: 'Almacén', costPerUnit: 0, usageType: 'CASAL', dailyLimit: 0
@@ -203,6 +208,28 @@ export const StockControl: React.FC<Props> = ({
          }
          setEditingItem(null);
       }
+   };
+
+   // --- TRASVASE DE STOCK ---
+   const handleTransferSubmit = () => {
+      if (!transferSourceItem || !transferDestId || transferQty <= 0) return;
+      if (transferQty > transferSourceItem.quantity) {
+         alert("No hay suficiente stock en el origen para trasladar esa cantidad.");
+         return;
+      }
+
+      const destItem = items.find(i => i.id === transferDestId);
+      if (!destItem) return;
+
+      // 1. Restar al origen
+      onUpdateStock(transferSourceItem.id, transferSourceItem.quantity - transferQty);
+      // 2. Sumar al destino
+      onUpdateStock(destItem.id, destItem.quantity + transferQty);
+
+      // Limpiar modal
+      setTransferSourceItem(null);
+      setTransferDestId('');
+      setTransferQty(1);
    };
 
    // --- PEDIDO MÍNIMO ---
@@ -420,6 +447,9 @@ export const StockControl: React.FC<Props> = ({
                               <span className="text-[10px] font-black text-slate-400 uppercase">Opciones</span>
                               <button onClick={() => setContextMenu(null)}><X size={16} className="text-slate-400" /></button>
                            </div>
+                           <button onClick={() => { setTransferSourceItem(item); setTransferDestId(''); setTransferQty(1); setContextMenu(null); }} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 hover:bg-orange-50 text-slate-600 hover:text-orange-600 font-bold text-xs transition-colors">
+                              <Repeat size={16} /> Traspasar Stock
+                           </button>
                            <button onClick={() => { setEditingItem(item); setActiveTab('STATS'); setContextMenu(null); }} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 font-bold text-xs transition-colors">
                               <BarChart3 size={16} /> Ver Estadísticas
                            </button>
@@ -873,6 +903,105 @@ export const StockControl: React.FC<Props> = ({
                         No, rotura / consumo
                      </button>
                   </div>
+               </div>
+            </div>
+         )}
+
+         {/* --- MODAL TRASVASE STOCK --- */}
+         {transferSourceItem && (
+            <div className="fixed inset-0 z-[500] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+               <div className="bg-white w-full max-w-md rounded-[32px] p-6 shadow-2xl border-4 border-orange-500">
+                  <div className="flex justify-between items-center mb-6">
+                     <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600">
+                           <Repeat size={20} />
+                        </div>
+                        <div>
+                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Movimiento</p>
+                           <h3 className="text-xl font-black text-slate-900 uppercase italic">Traspasar Stock</h3>
+                        </div>
+                     </div>
+                     <button onClick={() => setTransferSourceItem(null)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition-colors"><X size={20} /></button>
+                  </div>
+
+                  <div className="space-y-4">
+                     {/* ORIGEN */}
+                     <div className="bg-slate-50 rounded-2xl p-4 border-2 border-slate-100 flex justify-between items-center">
+                        <div>
+                           <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Extraer de:</p>
+                           <p className="font-black text-slate-900 uppercase truncate max-w-[200px]">{transferSourceItem.name}</p>
+                           <p className="text-xs font-bold text-slate-500">{transferSourceItem.usageType}</p>
+                        </div>
+                        <div className="text-right">
+                           <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Disponible</p>
+                           <p className="font-black text-xl text-slate-900">{transferSourceItem.quantity} <span className="text-xs text-slate-400">{transferSourceItem.unit}</span></p>
+                        </div>
+                     </div>
+
+                     <div className="flex justify-center -my-2 relative z-10">
+                        <div className="bg-white p-1 rounded-full"><div className="bg-orange-100 text-orange-600 p-1.5 rounded-full"><ArrowRight size={16} className="rotate-90" /></div></div>
+                     </div>
+
+                     {/* DESTINO */}
+                     <div className="bg-indigo-50 rounded-2xl p-4 border-2 border-indigo-100">
+                        <p className="text-[9px] font-black text-indigo-400 uppercase mb-2">Añadir a:</p>
+                        <select
+                           value={transferDestId}
+                           onChange={e => setTransferDestId(e.target.value)}
+                           className="w-full p-3 bg-white border-2 border-indigo-200 rounded-xl font-bold text-sm outline-none focus:border-indigo-400 text-slate-800"
+                        >
+                           <option value="" disabled>Selecciona el producto de destino...</option>
+                           {/* Priority: Same name, different usage */}
+                           {items.filter(i => i.id !== transferSourceItem.id && i.name.toUpperCase() === transferSourceItem.name.toUpperCase()).length > 0 && (
+                              <optgroup label="Coincidencias de nombre">
+                                 {items.filter(i => i.id !== transferSourceItem.id && i.name.toUpperCase() === transferSourceItem.name.toUpperCase()).map(i => (
+                                    <option key={i.id} value={i.id}>{i.name} ({i.usageType}) - Stock: {i.quantity}</option>
+                                 ))}
+                              </optgroup>
+                           )}
+                           <optgroup label="Todos los productos">
+                              {items.filter(i => i.id !== transferSourceItem.id).sort((a, b) => a.name.localeCompare(b.name)).map(i => (
+                                 <option key={i.id} value={i.id}>{i.name} ({i.usageType}) - Stock: {i.quantity}</option>
+                              ))}
+                           </optgroup>
+                        </select>
+                     </div>
+
+                     {/* CANTIDAD */}
+                     <div className="pt-2">
+                        <p className="text-[9px] font-black text-slate-400 uppercase mb-2 ml-2">¿Cuántas {transferSourceItem.unit} quieres mover?</p>
+                        <div className="flex items-center gap-4 bg-white border-2 border-slate-200 p-2 rounded-2xl">
+                           <button
+                              onClick={() => setTransferQty(Math.max(1, transferQty - 1))}
+                              className="w-12 h-12 bg-slate-100 hover:bg-slate-200 rounded-xl flex items-center justify-center text-slate-600 transition-colors"
+                           >
+                              <Minus />
+                           </button>
+                           <input
+                              type="number"
+                              value={transferQty}
+                              onChange={e => setTransferQty(Math.max(1, Math.min(transferSourceItem.quantity, Number(e.target.value))))}
+                              className="flex-1 bg-transparent text-center font-black text-3xl outline-none"
+                              min="1"
+                              max={transferSourceItem.quantity}
+                           />
+                           <button
+                              onClick={() => setTransferQty(Math.min(transferSourceItem.quantity, transferQty + 1))}
+                              className="w-12 h-12 bg-slate-100 hover:bg-slate-200 rounded-xl flex items-center justify-center text-slate-600 transition-colors"
+                           >
+                              <Plus />
+                           </button>
+                        </div>
+                     </div>
+                  </div>
+
+                  <button
+                     onClick={handleTransferSubmit}
+                     disabled={!transferDestId || transferQty <= 0}
+                     className="w-full mt-6 py-4 bg-orange-600 disabled:bg-slate-300 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all"
+                  >
+                     Confirmar Traspaso
+                  </button>
                </div>
             </div>
          )}

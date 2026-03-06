@@ -9,8 +9,10 @@ import {
     CalendarDays, Users, Calculator, Activity, PartyPopper, Cookie, Coffee,
     Lock, Unlock, Edit3, Check, PenTool, Box, Tag, DollarSign, Home, Store,
     Settings, Ruler, Sparkles, RefreshCcw, PlusCircle, AlertTriangle, FileInput,
-    ClipboardList, Archive, Printer, MessageCircle, Share2, List, Grid, ChevronDown
+    ClipboardList, Archive, Printer, MessageCircle, Share2, List, Grid, ChevronDown,
+    Camera, ScanLine, Loader2
 } from 'lucide-react';
+import { scanInvoiceToOrder } from '../services/geminiService';
 
 interface PlanItem {
     id: string;
@@ -69,6 +71,11 @@ export const PurchasePlanner: React.FC<Props> = ({ catalog, onUpdateCatalog, onC
 
     // Catalog Manager State
     const [newCatItem, setNewCatItem] = useState<Omit<CatalogItem, 'id'>>({ name: '', category: 'General', defaultPrice: 1, unit: 'u' });
+
+    // AI Scanner State
+    const [isScannerOpen, setIsScannerOpen] = useState(false);
+    const [isScanning, setIsScanning] = useState(false);
+    const [scanPreview, setScanPreview] = useState<string | null>(null);
 
     // Persistence
     useEffect(() => { localStorage.setItem('merello_purchase_plans', JSON.stringify(plans)); }, [plans]);
@@ -191,6 +198,71 @@ export const PurchasePlanner: React.FC<Props> = ({ catalog, onUpdateCatalog, onC
 
         handleDeletePlan(activePlan.id);
         setIsCheckoutOpen(false);
+    };
+
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Limitar tamaño de imagen para Gemini + PWA (resize client-side básico vía Canvas)
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const img = new Image();
+            img.onload = async () => {
+                const canvas = document.createElement('canvas');
+                const MAX_WIDTH = 1200;
+                let width = img.width;
+                let height = img.height;
+                if (width > MAX_WIDTH) {
+                    height = Math.round((height * MAX_WIDTH) / width);
+                    width = MAX_WIDTH;
+                }
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx?.drawImage(img, 0, 0, width, height);
+
+                const base64 = canvas.toDataURL('image/jpeg', 0.8);
+                setScanPreview(base64);
+
+                setIsScanning(true);
+                const itemsStr = await scanInvoiceToOrder(base64, 'image/jpeg');
+                setIsScanning(false);
+                setScanPreview(null);
+                setIsScannerOpen(false);
+
+                if (!itemsStr || !itemsStr.length) {
+                    alert("⚠️ No se pudieron extraer productos de la imagen.");
+                    return;
+                }
+
+                // Autocompletar borrador de pedido detectando si están en catálogo
+                const newItems: PlanItem[] = [];
+                itemsStr.forEach((mapped: any) => {
+                    const catMatch = (catalog as CatalogItem[]).find(c =>
+                        c.name.toLowerCase().includes(mapped.name.toLowerCase()) ||
+                        mapped.name.toLowerCase().includes(c.name.toLowerCase())
+                    );
+
+                    newItems.push({
+                        id: Math.random().toString(),
+                        catalogId: catMatch?.id || 'scan-temp',
+                        name: catMatch?.name || mapped.name.toUpperCase(),
+                        category: catMatch?.category || 'Sin Clasificar',
+                        quantity: mapped.quantity || 1,
+                        unitPrice: mapped.defaultPrice || catMatch?.defaultPrice || 0,
+                        unit: catMatch?.unit || 'u'
+                    });
+                });
+
+                if (newItems.length > 0) {
+                    updateActivePlan({ items: [...activePlan.items, ...newItems] });
+                    setTimeout(() => alert(`✨ ¡Escáner Mágico completado!\nSe añadieron ${newItems.length} componentes al borrador automatizados con IA.`), 100);
+                }
+            };
+            img.src = ev.target?.result as string;
+        };
+        reader.readAsDataURL(file);
     };
 
     // --- EXPORT TOOLS ---
@@ -384,8 +456,12 @@ export const PurchasePlanner: React.FC<Props> = ({ catalog, onUpdateCatalog, onC
                                 <button onClick={handleShareWhatsapp} disabled={activePlan.items.length === 0} className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-50"><MessageCircle size={18} /></button>
                             </div>
 
-                            <button onClick={handleAutoFill} className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 border border-amber-100 rounded-xl hover:bg-amber-100 transition-all font-bold text-[10px] uppercase tracking-widest shrink-0">
-                                <Sparkles size={14} /> <span className="hidden sm:inline">Auto-Stock</span>
+                            <button onClick={handleAutoFill} className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 border border-amber-100 rounded-xl hover:bg-amber-100 transition-all font-bold text-[10px] uppercase tracking-widest shrink-0 shadow-sm">
+                                <Sparkles size={14} /> <span className="hidden xl:inline">Auto-Stock</span>
+                            </button>
+
+                            <button onClick={() => setIsScannerOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all font-black text-[10px] uppercase tracking-widest shrink-0 shadow-md shadow-indigo-500/30">
+                                <ScanLine size={14} /> <span className="hidden xl:inline">Escáner IA</span>
                             </button>
                         </div>
                     </div>
@@ -647,6 +723,68 @@ export const PurchasePlanner: React.FC<Props> = ({ catalog, onUpdateCatalog, onC
                                     ))}
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 3. AI SCANNER MODAL */}
+            {isScannerOpen && (
+                <div className="fixed inset-0 z-[300] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
+                    <div className="bg-white rounded-[40px] p-8 w-full max-w-sm shadow-2xl flex flex-col items-center text-center border-4 border-indigo-500 relative overflow-hidden">
+                        {/* Decorative Background */}
+                        <div className="absolute -top-20 -right-20 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl"></div>
+                        <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl"></div>
+
+                        <div className="relative z-10 w-full flex flex-col items-center">
+                            <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl flex items-center justify-center text-white shadow-xl mb-6 shadow-indigo-500/30 animate-bounce-slow">
+                                <Sparkles size={40} />
+                            </div>
+
+                            <h3 className="text-3xl font-black italic uppercase tracking-tighter text-slate-900 mb-2">
+                                {isScanning ? 'Mágia en Proceso...' : 'Escáner Mágico'}
+                            </h3>
+
+                            {!isScanning && (
+                                <p className="text-slate-500 text-xs font-bold leading-relaxed px-4 mb-8">
+                                    Apunta la cámara a una lista de la compra o albarán físico. Gemini extraerá las cantidades por ti automáticamente.
+                                </p>
+                            )}
+
+                            {scanPreview && (
+                                <div className="w-full aspect-[4/5] bg-slate-100 rounded-3xl mb-8 overflow-hidden border-2 border-indigo-100 relative shadow-inner">
+                                    <img src={scanPreview} className="w-full h-full object-cover opacity-50 sepia-[0.3]" />
+                                    <div className="absolute inset-0 bg-indigo-900/40 flex flex-col items-center justify-center backdrop-blur-[2px]">
+                                        <Loader2 className="animate-spin text-white mb-4" size={48} />
+                                        <div className="px-4 py-2 bg-white/20 rounded-full backdrop-blur-md text-white font-black uppercase text-[10px] tracking-widest border border-white/30">
+                                            Extrayendo Productos...
+                                        </div>
+                                    </div>
+
+                                    {/* Sonar Scan Animation */}
+                                    <div className="absolute top-0 left-0 w-full h-2 bg-emerald-400 shadow-[0_0_20px_5px_rgba(52,211,153,0.5)] animate-scan-line"></div>
+                                </div>
+                            )}
+
+                            {!isScanning && (
+                                <div className="w-full space-y-3">
+                                    <div className="relative">
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            capture="environment"
+                                            onChange={handleFileSelect}
+                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                                        />
+                                        <button className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center justify-center gap-3 relative z-10 pointer-events-none">
+                                            <Camera size={20} /> Usar Cámara Trasera
+                                        </button>
+                                    </div>
+                                    <button onClick={() => setIsScannerOpen(false)} className="w-full py-4 text-slate-400 hover:bg-slate-50 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-colors">
+                                        Cancelar
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

@@ -82,6 +82,7 @@ export const KioskMode: React.FC<KioskModeProps> = ({
     const [restockQty, setRestockQty] = useState(1);
     const [restockUrgency, setRestockUrgency] = useState<'NORMAL' | 'URGENT'>('NORMAL');
     const [justification, setJustification] = useState(''); // Para peticiones que excedan cupo
+    const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
     // Change Request State (Para Cajeros)
     const [showChangeRequestModal, setShowChangeRequestModal] = useState(false);
@@ -100,6 +101,19 @@ export const KioskMode: React.FC<KioskModeProps> = ({
         return incidents
             .filter(inc => inc.stockItemId === itemId && inc.timestamp.startsWith(today) && inc.status === 'RESOLVED')
             .reduce((acc, inc) => acc + (inc.quantity || 1), 0);
+    };
+
+    const getCatEmoji = (categoryName?: string) => {
+        const cat = categoryName?.toUpperCase() || '';
+        if (cat.includes('BEBIDA')) return '🍺';
+        if (cat.includes('LICOR')) return '🥃';
+        if (cat.includes('REFRESCO')) return '🥤';
+        if (cat.includes('VINO')) return '🍷';
+        if (cat.includes('SUMINISTRO')) return '🧻';
+        if (cat.includes('COMIDA')) return '🍖';
+        if (cat.includes('HIELO')) return '🧊';
+        if (cat.includes('VASO')) return '🥤';
+        return '📦';
     };
 
     const cartTotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
@@ -611,88 +625,113 @@ export const KioskMode: React.FC<KioskModeProps> = ({
                         </div>
                     </div>
                 </div>
+
+                {selectedCategory && (
+                    <div className="absolute bottom-0 left-0 right-0 z-20 translate-y-1/2 flex justify-center">
+                        <button
+                            onClick={() => setSelectedCategory(null)}
+                            className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-2 rounded-full font-black uppercase text-xs tracking-widest border border-white/10 shadow-xl flex items-center gap-2 transition-all active:scale-95"
+                        >
+                            <X size={14} /> Volver a Categorías
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* GRID STOCK PREMIUM */}
             <div className="flex-1 overflow-y-auto p-3 md:p-6 pb-28">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-5">
-                    {itemsToShow.map(item => {
-                        const isLow = item.quantity <= item.minStock;
-                        const limit = item.dailyLimit || 0;
-                        const todayUsage = limit > 0 ? getTodayUsage(item.id) : 0;
-                        const remaining = Math.max(0, limit - todayUsage);
-                        const stockPercent = item.minStock > 0 ? Math.min((item.quantity / (item.minStock * 2)) * 100, 100) : 100;
+                {!selectedCategory ? (
+                    /* VIEW 1: CATEGORY SELECTION */
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-5 animate-in fade-in zoom-in-95 duration-300">
+                        {Array.from(new Set(itemsToShow.map(i => i.category || 'VARIOS'))).map(categoryName => {
+                            const count = itemsToShow.filter(i => (i.category || 'VARIOS') === categoryName).length;
+                            return (
+                                <button
+                                    key={categoryName}
+                                    onClick={() => setSelectedCategory(categoryName)}
+                                    className="group relative rounded-[32px] overflow-hidden cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl active:scale-95 bg-slate-900 border border-white/10 aspect-square flex flex-col items-center justify-center p-6"
+                                >
+                                    <div className="absolute inset-0 bg-gradient-to-t from-indigo-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                    <span className="text-6xl drop-shadow-xl group-hover:scale-110 transition-transform mb-4">
+                                        {getCatEmoji(categoryName)}
+                                    </span>
+                                    <h3 className="font-black text-lg md:text-xl uppercase text-white tracking-tight mb-2">{categoryName}</h3>
+                                    <span className="text-[10px] font-bold uppercase text-indigo-400 bg-indigo-500/10 px-3 py-1 rounded-full">{count} Productos</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    /* VIEW 2: PRODUCT LIST BY CATEGORY */
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-5 animate-in fade-in slide-in-from-right-8 duration-300">
+                        {itemsToShow.filter(i => (i.category || 'VARIOS') === selectedCategory).map(item => {
+                            const isLow = item.quantity <= item.minStock;
+                            const limit = item.dailyLimit || 0;
+                            const todayUsage = limit > 0 ? getTodayUsage(item.id) : 0;
+                            const remaining = Math.max(0, limit - todayUsage);
+                            const stockPercent = item.minStock > 0 ? Math.min((item.quantity / (item.minStock * 2)) * 100, 100) : 100;
+                            const catEmoji = getCatEmoji(item.category);
 
-                        // Emoji según categoría para distinguir visualmente
-                        const catEmoji = item.category?.includes('BEBIDA') ? '🍺'
-                            : item.category?.includes('LICOR') ? '🥃'
-                                : item.category?.includes('REFRESCO') ? '🥤'
-                                    : item.category?.includes('VINO') ? '🍷'
-                                        : item.category?.includes('SUMINISTRO') ? '🧻'
-                                            : item.category?.includes('COMIDA') ? '🍖'
-                                                : item.category?.includes('HIELO') ? '🧊'
-                                                    : item.category?.includes('VASO') ? '🥤'
-                                                        : '📦';
-
-                        return (
-                            <button
-                                key={item.id}
-                                onClick={() => { setRestockItem(item); setRestockQty(1); }}
-                                className={`group relative rounded-[28px] overflow-hidden cursor-pointer transition-all duration-300
+                            return (
+                                <button
+                                    key={item.id}
+                                    onClick={() => { setRestockItem(item); setRestockQty(1); }}
+                                    className={`group relative rounded-[28px] overflow-hidden cursor-pointer transition-all duration-300
                                       hover:-translate-y-1 hover:shadow-2xl active:scale-95
                                       ${isLow
-                                        ? 'bg-gradient-to-br from-amber-500/10 to-red-500/10 border-2 border-amber-500/50 shadow-lg shadow-amber-500/10 hover:shadow-amber-500/30'
-                                        : 'bg-white/[0.04] border-2 border-white/10 hover:border-indigo-500/40 hover:shadow-indigo-500/20'
-                                    }`}
-                            >
-                                {/* Glow effect */}
-                                <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ${isLow ? 'bg-gradient-to-t from-amber-500/10 to-transparent' : 'bg-gradient-to-t from-indigo-500/10 to-transparent'}`}></div>
+                                            ? 'bg-gradient-to-br from-amber-500/10 to-red-500/10 border-2 border-amber-500/50 shadow-lg shadow-amber-500/10 hover:shadow-amber-500/30'
+                                            : 'bg-white/[0.04] border-2 border-white/10 hover:border-indigo-500/40 hover:shadow-indigo-500/20'
+                                        }`}
+                                >
+                                    {/* Glow effect */}
+                                    <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ${isLow ? 'bg-gradient-to-t from-amber-500/10 to-transparent' : 'bg-gradient-to-t from-indigo-500/10 to-transparent'}`}></div>
 
-                                {/* Content */}
-                                <div className="relative z-10 p-3 md:p-4 flex flex-col h-[150px] md:h-[180px]">
-                                    {/* Top row: photo/emoji + badge */}
-                                    <div className="flex justify-between items-start mb-2">
-                                        {item.imageUrl ? (
-                                            <img src={item.imageUrl} alt={item.name} className="w-12 h-12 rounded-xl object-cover border-2 border-white/20 shadow-lg group-hover:scale-110 transition-transform" onError={(e) => { const el = e.currentTarget; el.style.display = 'none'; }} />
-                                        ) : null}
-                                        <span className={`text-3xl drop-shadow-lg group-hover:scale-110 transition-transform ${item.imageUrl ? 'hidden' : ''}`}>{catEmoji}</span>
-                                        {isLow && (
-                                            <span className="px-2 py-0.5 bg-amber-500 text-[9px] font-black uppercase rounded-full text-amber-950 animate-pulse shadow-lg">⚠ Bajo</span>
-                                        )}
-                                        {limit > 0 && !isLow && (
-                                            <span className="px-2 py-0.5 bg-slate-700/80 text-[9px] font-black uppercase rounded-full text-slate-300 border border-white/10">{remaining}/{limit}</span>
-                                        )}
-                                    </div>
-
-                                    {/* Product name */}
-                                    <h4 className="font-black text-sm uppercase text-white leading-snug line-clamp-2 mb-auto tracking-tight">
-                                        {item.name}
-                                    </h4>
-
-                                    {/* Bottom: stock bar + number */}
-                                    <div className="mt-3 space-y-2">
-                                        {/* Stock progress bar */}
-                                        <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
-                                            <div
-                                                className={`h-full rounded-full transition-all duration-700 ${isLow ? 'bg-gradient-to-r from-amber-500 to-red-500' : 'bg-gradient-to-r from-emerald-500 to-cyan-400'}`}
-                                                style={{ width: `${stockPercent}%` }}
-                                            ></div>
+                                    {/* Content */}
+                                    <div className="relative z-10 p-3 md:p-4 flex flex-col h-[150px] md:h-[180px]">
+                                        {/* Top row: photo/emoji + badge */}
+                                        <div className="flex justify-between items-start mb-2">
+                                            {item.imageUrl ? (
+                                                <img src={item.imageUrl} alt={item.name} className="w-12 h-12 rounded-xl object-cover border-2 border-white/20 shadow-lg group-hover:scale-110 transition-transform" onError={(e) => { const el = e.currentTarget; el.style.display = 'none'; }} />
+                                            ) : null}
+                                            <span className={`text-3xl drop-shadow-lg group-hover:scale-110 transition-transform ${item.imageUrl ? 'hidden' : ''}`}>{catEmoji}</span>
+                                            {isLow && (
+                                                <span className="px-2 py-0.5 bg-amber-500 text-[9px] font-black uppercase rounded-full text-amber-950 animate-pulse shadow-lg">⚠ Bajo</span>
+                                            )}
+                                            {limit > 0 && !isLow && (
+                                                <span className="px-2 py-0.5 bg-slate-700/80 text-[9px] font-black uppercase rounded-full text-slate-300 border border-white/10">{remaining}/{limit}</span>
+                                            )}
                                         </div>
 
-                                        {/* Stock number */}
-                                        <div className="flex justify-between items-baseline">
-                                            <span className="text-[9px] font-bold text-slate-500 uppercase">Stock</span>
-                                            <div className="flex items-baseline gap-1">
-                                                <span className={`text-xl font-black tabular-nums ${isLow ? 'text-amber-400' : 'text-white'}`}>{item.quantity}</span>
-                                                <span className="text-[10px] font-bold text-slate-500">{item.unit}</span>
+                                        {/* Product name */}
+                                        <h4 className="font-black text-sm uppercase text-white leading-snug line-clamp-2 mb-auto tracking-tight">
+                                            {item.name}
+                                        </h4>
+
+                                        {/* Bottom: stock bar + number */}
+                                        <div className="mt-3 space-y-2">
+                                            {/* Stock progress bar */}
+                                            <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                                                <div
+                                                    className={`h-full rounded-full transition-all duration-700 ${isLow ? 'bg-gradient-to-r from-amber-500 to-red-500' : 'bg-gradient-to-r from-emerald-500 to-cyan-400'}`}
+                                                    style={{ width: `${stockPercent}%` }}
+                                                ></div>
+                                            </div>
+
+                                            {/* Stock number */}
+                                            <div className="flex justify-between items-baseline">
+                                                <span className="text-[9px] font-bold text-slate-500 uppercase">Stock</span>
+                                                <div className="flex items-baseline gap-1">
+                                                    <span className={`text-xl font-black tabular-nums ${isLow ? 'text-amber-400' : 'text-white'}`}>{item.quantity}</span>
+                                                    <span className="text-[10px] font-bold text-slate-500">{item.unit}</span>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            </button>
-                        );
-                    })}
-                </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
 
             {/* BOTTOM BAR PREMIUM */}

@@ -85,3 +85,83 @@ export const generateFallasAdvice = async (
     return `Error inesperado: ${err?.message || 'desconocido'}`;
   }
 };
+
+/**
+ * Escanea un albarán / factura en base64 y devuelve un array JSON de artículos.
+ */
+export const scanInvoiceToOrder = async (
+  base64Image: string,
+  mimeType: string = 'image/jpeg'
+): Promise<{ name: string; quantity: number; defaultPrice: number }[] | null> => {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    console.error('Sin clave API de Gemini configurada.');
+    return null;
+  }
+
+  // Eliminamos el prefijo data:image/...;base64, si lo lleva
+  const cleanBase64 = base64Image.split(',')[1] || base64Image;
+
+  const SCAN_INSTRUCTION = `Eres una herramienta de extracción de datos de compras para un ERP de supermercado/bar.
+Instrucciones obligatorias:
+1. Extrae de la factura o lista de la compra proporcionada la matriz de productos.
+2. Cada producto debe tener "name" (string, nombre claro y directo), "quantity" (number, cantidad detectada o 1 por defecto) y "defaultPrice" (number, precio total de la fila dividido cantidad, o coste unitario, 0 por defecto).
+3. Tu salida debe ser ÚNICA y EXCLUSIVAMENTE un Array JSON válido. NO uses Markdown, NO uses comillas \`\`\`, solo texto JSON puro.`;
+
+  try {
+    const res = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: {
+          parts: [{ text: SCAN_INSTRUCTION }]
+        },
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { text: "Extrae los artículos de esta factura en formato JSON." },
+              {
+                inline_data: {
+                  mime_type: mimeType,
+                  data: cleanBase64
+                }
+              }
+            ]
+          }
+        ],
+        generationConfig: {
+          temperature: 0.1,
+          responseMimeType: 'application/json'
+        }
+      })
+    });
+
+    if (!res.ok) {
+      console.error('[Merello AI] Error vision:', await res.text());
+      return null;
+    }
+
+    const json = await res.json();
+    const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!text) {
+      console.error('[Merello AI] Respuesta vacía en escaneo:', JSON.stringify(json));
+      return null;
+    }
+
+    try {
+      // Limpieza preventiva por si el LLM cuela Markdown
+      const cleanJson = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+      const items = JSON.parse(cleanJson);
+      if (Array.isArray(items)) return items;
+      return null;
+    } catch (parseErr) {
+      console.error('[Merello AI] Error parseando JSON de factura:', parseErr, text);
+      return null;
+    }
+  } catch (err) {
+    console.error('[Merello AI] Error red escaneo:', err);
+    return null;
+  }
+};
