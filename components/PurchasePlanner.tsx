@@ -204,6 +204,9 @@ export const PurchasePlanner: React.FC<Props> = ({ catalog, onUpdateCatalog, onC
         const file = e.target.files?.[0];
         if (!file) return;
 
+        // Reset the input value so the same file can be selected again if needed
+        e.target.value = '';
+
         // Limitar tamaño de imagen para Gemini + PWA (resize client-side básico vía Canvas)
         const reader = new FileReader();
         reader.onload = (ev) => {
@@ -772,6 +775,7 @@ export const PurchasePlanner: React.FC<Props> = ({ catalog, onUpdateCatalog, onC
 
                             {!isScanning && (
                                 <div className="w-full space-y-3">
+                                    {/* Opción 1: Cámara */}
                                     <div className="relative">
                                         <input
                                             type="file"
@@ -781,7 +785,19 @@ export const PurchasePlanner: React.FC<Props> = ({ catalog, onUpdateCatalog, onC
                                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
                                         />
                                         <button className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center justify-center gap-3 relative z-10 pointer-events-none">
-                                            <Camera size={20} /> Usar Cámara Trasera
+                                            <Camera size={20} /> 📸 Hacer Foto
+                                        </button>
+                                    </div>
+                                    {/* Opción 2: Galería */}
+                                    <div className="relative">
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleFileSelect}
+                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                                        />
+                                        <button className="w-full py-5 bg-white text-indigo-600 border-2 border-indigo-200 rounded-2xl font-black uppercase text-xs tracking-widest shadow-sm hover:bg-indigo-50 transition-all flex items-center justify-center gap-3 relative z-10 pointer-events-none">
+                                            <FileInput size={20} /> 🖼️ Elegir de Galería
                                         </button>
                                     </div>
                                     <button onClick={() => setIsScannerOpen(false)} className="w-full py-4 text-slate-400 hover:bg-slate-50 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-colors">
