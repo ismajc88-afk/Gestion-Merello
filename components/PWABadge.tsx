@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { RefreshCw, X } from 'lucide-react';
 
@@ -7,10 +7,10 @@ export function PWABadge() {
         needRefresh: [needRefresh, setNeedRefresh],
         updateServiceWorker,
     } = useRegisterSW({
-        onRegistered(r) {
+        onRegistered(r: ServiceWorkerRegistration | undefined) {
             console.log('SW Registered: ' + r);
         },
-        onRegisterError(error) {
+        onRegisterError(error: Error) {
             console.log('SW registration error', error);
         },
     });
