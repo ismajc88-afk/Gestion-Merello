@@ -36,6 +36,11 @@
     "**/*.tsx"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "aphelion-copernicus",
+    "kinetic-cassini",
+    "solitary-planetarium",
+    "__tests__",
+    "vitest.config.ts"
   ]
 }
