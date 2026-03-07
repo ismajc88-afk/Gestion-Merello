@@ -11,7 +11,7 @@ import {
     Package, Check,
     X, Plus, Minus, Ticket,
     RotateCcw, Zap, ZapOff,
-    Lock, ShieldAlert, History
+    Lock, ShieldAlert, History, Banknote
 } from 'lucide-react';
 import { useScreenWakeLock } from '../hooks/useScreenWakeLock';
 
@@ -128,6 +128,11 @@ export const KioskMode: React.FC<KioskModeProps> = ({
         alert("❄️ AVISO DE HIELO ENVIADO");
     };
 
+    const handleChangeRequest = () => {
+        onCreateIncident('💵 CAJA SIN CAMBIO - Se necesita cambio urgente en caja', 'URGENT', undefined, undefined, initialMode);
+        toast.success('✅ Petición de cambio enviada al encargado');
+    };
+
     const confirmRestock = () => {
         if (!restockItem) return;
         onCreateIncident(`Reposición: ${restockItem.name}`, restockUrgency, restockItem.id, restockQty, initialMode);
@@ -171,6 +176,13 @@ export const KioskMode: React.FC<KioskModeProps> = ({
                         <button onClick={toggleLock} className={`p-3 rounded-xl transition-all ${isLocked ? 'bg-amber-500 text-slate-900 shadow-[0_0_15px_rgba(245,158,11,0.4)]' : 'bg-white/10 text-slate-400'}`}>{isLocked ? <Zap size={20} fill="currentColor" /> : <ZapOff size={20} />}</button>
                         <button onClick={() => { setCorrectionMode(!correctionMode); setManualCountMode(false); }} className={`p-3 rounded-xl ${correctionMode ? 'bg-rose-500 animate-pulse' : 'bg-white/10'}`}><RotateCcw size={20} /></button>
                         <button onClick={() => setShowCounter(true)} className="p-3 bg-indigo-600/20 text-indigo-400 rounded-xl"><Ticket size={20} /></button>
+                        <button
+                            onClick={handleChangeRequest}
+                            className="p-3 bg-amber-500/20 text-amber-300 rounded-xl hover:bg-amber-500/40 active:scale-95 transition-all"
+                            title="Pedir cambio"
+                        >
+                            <Banknote size={20} />
+                        </button>
                     </div>
                 </div>
 
