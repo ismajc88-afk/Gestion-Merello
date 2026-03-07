@@ -1,119 +1,38 @@
 
 import React, { useState } from 'react';
-import { AppData, AppConfig, UserRole, BarPrice, KioskConfig, BasicItem, PREDEFINED_STOCK_CATEGORIES } from '../types';
+import { AppData, AppConfig, UserRole, BarPrice, KioskConfig, CustomPermission } from '../types';
 import {
-   Settings, ShieldAlert, Key, Edit3, Trash2,
+   Settings, ShieldAlert, Key, Trash2,
    Save, AlertTriangle, CheckCircle2, RefreshCw,
-   Lock, Smartphone, Database, Zap, FileText,
-   Users, Wallet, Truck, Beer, Plus, Tag, Clock,
-   DollarSign, ChevronRight, X, ShieldCheck, Box, Ruler, Calendar, MapPin,
-   ClipboardList, Wifi, Monitor, Activity, Cloud, UploadCloud, Ticket, Home, Calculator,
-   ShoppingBag, List, Shield, FlaskConical, Beaker
+   Lock, Database,
+   Users, Wallet, Truck, Beer, Plus, Tag,
+   X, ShieldCheck, Box, Ruler, MapPin,
+   ClipboardList, Wifi, Monitor, UploadCloud, Ticket, Home, Calculator,
+   UserCog
 } from 'lucide-react';
 import { SyncModules } from './SyncModules';
-import { RolePermissionsPanel } from './RolePermissionsPanel';
-import { AuditLog } from './AuditLog';
-import { ConfirmModal } from './ConfirmModal';
-import { History, DownloadCloud } from 'lucide-react';
-import { db, doc, setDoc } from '../services/firebase';
+import { getAllModules, getRoleLabel, ROLE_PERMISSIONS } from '../utils/permissions';
 
 interface Props {
    data: AppData;
    onUpdateConfig: (config: AppConfig) => void;
+   onUpdateData: (updates: Partial<AppData>) => void; // NEW: For updating customPermissions
    onResetModule: (key: string) => void;
    onFullImport?: (newData: AppData) => void;
    peerCount?: number;
    kioskConfig?: KioskConfig;
    onUpdateKioskConfig?: (config: KioskConfig) => void;
-   onClearAuditLog?: () => void;
-   onHardReset?: () => void;
 }
 
-export const AdminControlPanel: React.FC<Props> = ({ data, onUpdateConfig, onResetModule, onFullImport, peerCount = 0, kioskConfig, onUpdateKioskConfig, onClearAuditLog, onHardReset }) => {
+export const AdminControlPanel: React.FC<Props> = ({ data, onUpdateConfig, onUpdateData, onResetModule, onFullImport, peerCount = 0, kioskConfig, onUpdateKioskConfig }) => {
    const [config, setConfig] = useState<AppConfig>(data.appConfig);
-   const [activeTab, setActiveTab] = useState<'IDENTITY' | 'PRICES' | 'MASTERS' | 'PERMISOS' | 'SYNC' | 'DANGER' | 'AUDIT'>('IDENTITY');
+   const [activeTab, setActiveTab] = useState<'IDENTITY' | 'PRICES' | 'MASTERS' | 'PERMISSIONS' | 'SYNC' | 'DANGER'>('IDENTITY');
    const [newVal, setNewVal] = useState('');
-   const [newSubcat, setNewSubcat] = useState<Record<string, string>>({});
    const [activeMaster, setActiveMaster] = useState<'SUPPLIERS' | 'BUDGET' | 'STOCK' | 'UNITS' | 'LOCATIONS'>('SUPPLIERS');
+   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
    // New Ticket Form State
    const [newTicket, setNewTicket] = useState({ name: '', price: '1.00', category: 'ALCOHOL' });
-
-   // Recipe Engine State (Escandallos)
-   const [editingRecipeFor, setEditingRecipeFor] = useState<number | null>(null);
-   const [recipeBuilderItem, setRecipeBuilderItem] = useState<{ stockItemId: string, quantity: string }>({ stockItemId: '', quantity: '1' });
-
-   // Backups State
-   const [backups, setBackups] = useState<any[]>([]);
-   const [isBackingUp, setIsBackingUp] = useState(false);
-   const [pendingDangerAction, setPendingDangerAction] = useState<{ title: string; message: string; confirmWord: string; onConfirm: () => void } | null>(null);
-
-   // Carga de Backups Históricos
-   const loadBackups = async () => {
-      try {
-         /*const q = query(collection(db, 'falla_backups', 'merello2026', 'history'), orderBy('timestamp', 'desc'), limit(15));
-         const snapshot = await getDocs(q);
-         const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-         setBackups(list);*/
-      } catch (err) {
-         console.warn("No se pudieron cargar los backups:", err);
-      }
-   };
-
-   React.useEffect(() => {
-      //if (activeTab === 'SYNC') loadBackups();
-   }, [activeTab]);
-
-   // Backup Automático Diario a las 04:00 AM
-   React.useEffect(() => {
-      const runAutoBackup = async () => {
-         const now = new Date();
-         if (now.getHours() >= 4) {
-            const dateStr = now.toLocaleDateString('es-ES');
-            const lastAuto = localStorage.getItem('merello_last_auto_backup');
-            if (lastAuto !== dateStr) {
-               try {
-                  /*await addDoc(collection(db, 'falla_backups', 'merello2026', 'history'), {
-                     timestamp: now.toISOString(),
-                     trigger: 'AUTO_NIGHT_BACKUP',
-                     data: data
-                  });*/
-                  localStorage.setItem('merello_last_auto_backup', dateStr);
-                  console.log("Auto-backup completado con éxito a las 4 AM.");
-               } catch (e) { console.error("Fallo auto-backup", e); }
-            }
-         }
-      };
-      runAutoBackup();
-   }, []);
-
-   const createManualBackup = async () => {
-      setIsBackingUp(true);
-      try {
-         /*await addDoc(collection(db, 'falla_backups', 'merello2026', 'history'), {
-            timestamp: new Date().toISOString(),
-            trigger: 'MANUAL_ADMIN',
-            data: data
-         });*/
-         alert("✅ Copia de Seguridad generada y guardada en la Nube.");
-         loadBackups();
-      } catch (err) {
-         alert("❌ Error creando backup: " + err);
-      }
-      setIsBackingUp(false);
-   };
-
-   const restoreBackup = async (backupData: AppData) => {
-      if (!confirm("⚠️ ATENCIÓN: Vas a sobreescribir la Base de Datos actual con esta copia pasada. Todos los cambios recientes se perderán irreversiblemente. ¿Estás absolutamente seguro?")) return;
-      if (!confirm("⚠️ DOBLE CONFIRMACIÓN: ¿Restaurar Base de Datos a la copia seleccionada?")) return;
-      try {
-         await setDoc(doc(db, 'falla/merello2026'), backupData);
-         alert("✅ RESTAURACIÓN COMPLETADA. La app se recargará ahora.");
-         window.location.reload();
-      } catch (err) {
-         alert("❌ Error al restaurar: " + err);
-      }
-   };
 
    const handleSave = () => {
       onUpdateConfig(config);
@@ -140,9 +59,22 @@ export const AdminControlPanel: React.FC<Props> = ({ data, onUpdateConfig, onRes
    };
 
    const updatePrice = (index: number, field: keyof BarPrice, value: any) => {
+      const oldName = config.barPrices[index].name;
       const newPrices = [...config.barPrices];
       newPrices[index] = { ...newPrices[index], [field]: value };
       setConfig({ ...config, barPrices: newPrices });
+
+      // FIX: Propagate name changes to KioskConfig to avoid breaking links
+      if (field === 'name' && kioskConfig && onUpdateKioskConfig) {
+         const newKiosk = { ...kioskConfig };
+         const replaceIn = (arr: string[]) => arr.map(n => n === oldName ? value : n);
+
+         newKiosk.alcoholItems = replaceIn(newKiosk.alcoholItems);
+         newKiosk.mixerItems = replaceIn(newKiosk.mixerItems);
+         newKiosk.cupItems = replaceIn(newKiosk.cupItems);
+
+         onUpdateKioskConfig(newKiosk);
+      }
    };
 
    const removePrice = (item: BarPrice) => {
@@ -182,49 +114,26 @@ export const AdminControlPanel: React.FC<Props> = ({ data, onUpdateConfig, onRes
       setNewTicket({ name: '', price: '', category: 'ALCOHOL' });
    };
 
-   // --- RECIPE BUILDER ---
-   const currentEditingPrice = editingRecipeFor !== null ? config.barPrices[editingRecipeFor] : null;
-
-   const getRecipeCost = (recipe: BarPrice['recipe']) => {
-      if (!recipe) return 0;
-      return recipe.reduce((acc: number, r: NonNullable<BarPrice['recipe']>[number]) => {
-         const stockItem = data.stock.find(s => s.id === r.stockItemId);
-         return acc + (stockItem ? stockItem.costPerUnit * r.quantity : 0);
-      }, 0);
+   const getKioskCategory = (itemName: string) => {
+      if (!kioskConfig) return 'NONE';
+      if (kioskConfig.alcoholItems.includes(itemName)) return 'ALCOHOL';
+      if (kioskConfig.mixerItems.includes(itemName)) return 'REFRESCO';
+      if (kioskConfig.cupItems.includes(itemName)) return 'OTRO';
+      return 'NONE';
    };
 
-   const handleAddRecipeItem = () => {
-      if (editingRecipeFor === null || !currentEditingPrice || !recipeBuilderItem.stockItemId) return;
+   const updateKioskCategory = (itemName: string, newCategory: string) => {
+      if (!kioskConfig || !onUpdateKioskConfig) return;
+      const newKiosk = { ...kioskConfig };
+      newKiosk.alcoholItems = newKiosk.alcoholItems.filter(n => n !== itemName);
+      newKiosk.mixerItems = newKiosk.mixerItems.filter(n => n !== itemName);
+      newKiosk.cupItems = newKiosk.cupItems.filter(n => n !== itemName);
 
-      const stockRef = data.stock.find(s => s.id === recipeBuilderItem.stockItemId);
-      if (!stockRef) return;
+      if (newCategory === 'ALCOHOL') newKiosk.alcoholItems.push(itemName);
+      else if (newCategory === 'REFRESCO') newKiosk.mixerItems.push(itemName);
+      else if (newCategory === 'OTRO') newKiosk.cupItems.push(itemName);
 
-      const qty = parseFloat(recipeBuilderItem.quantity) || 0;
-      if (qty <= 0) return;
-
-      const currentRecipe = currentEditingPrice.recipe || [];
-      const newPrices = [...config.barPrices];
-
-      // If item already in recipe, update qty, else add
-      const existingIdx = currentRecipe.findIndex(r => r.stockItemId === stockRef.id);
-      let newRecipe = [...currentRecipe];
-      if (existingIdx >= 0) {
-         newRecipe[existingIdx] = { ...newRecipe[existingIdx], quantity: newRecipe[existingIdx].quantity + qty };
-      } else {
-         newRecipe.push({ stockItemId: stockRef.id, stockItemName: stockRef.name, quantity: qty });
-      }
-
-      newPrices[editingRecipeFor] = { ...currentEditingPrice, recipe: newRecipe };
-      setConfig({ ...config, barPrices: newPrices });
-      setRecipeBuilderItem({ stockItemId: '', quantity: '1' });
-   };
-
-   const handleRemoveRecipeItem = (stockItemId: string) => {
-      if (editingRecipeFor === null || !currentEditingPrice) return;
-      const newPrices = [...config.barPrices];
-      const newRecipe = (currentEditingPrice.recipe || []).filter(r => r.stockItemId !== stockItemId);
-      newPrices[editingRecipeFor] = { ...currentEditingPrice, recipe: newRecipe };
-      setConfig({ ...config, barPrices: newPrices });
+      onUpdateKioskConfig(newKiosk);
    };
 
    const securityRoles: { id: UserRole, label: string, icon: any }[] = [
@@ -273,9 +182,8 @@ export const AdminControlPanel: React.FC<Props> = ({ data, onUpdateConfig, onRes
                { id: 'IDENTITY', label: 'Seguridad y PINs', icon: Lock },
                { id: 'PRICES', label: 'Productos y Tickets', icon: Ticket },
                { id: 'MASTERS', label: 'Maestros', icon: Database },
-               { id: 'PERMISOS', label: 'Permisos por Rol', icon: Shield },
+               { id: 'PERMISSIONS', label: 'Permisos de Usuario', icon: UserCog },
                { id: 'SYNC', label: 'Nube / Backup', icon: UploadCloud },
-               { id: 'AUDIT', label: 'Auditoría', icon: History },
                { id: 'DANGER', label: 'Danger Zone', icon: AlertTriangle }
             ].map(tab => (
                <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex-1 flex items-center justify-center gap-2 py-4 px-6 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-indigo-600 text-white shadow-lg scale-105' : 'text-slate-400 hover:bg-slate-50'}`}>
@@ -288,28 +196,10 @@ export const AdminControlPanel: React.FC<Props> = ({ data, onUpdateConfig, onRes
 
             <div className="lg:col-span-8">
 
-               {/* TEMA: AUDITORÍA */}
-               {activeTab === 'AUDIT' && (
-                  <div className="space-y-8 animate-in slide-in-from-bottom-4">
-                     <div className="bg-white p-10 rounded-[48px] border-2 border-slate-100 shadow-sm space-y-6">
-                        <div className="flex justify-between items-center">
-                           <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-3">
-                              <History size={20} className="text-indigo-600" /> Historial de Acciones
-                           </h3>
-                           <span className="text-[9px] font-black text-indigo-500 bg-indigo-50 px-3 py-1 rounded-full uppercase">
-                              {data.auditLog?.length ?? 0} entradas
-                           </span>
-                        </div>
-                        <AuditLog auditLog={data.auditLog ?? []} onClearLog={onClearAuditLog} />
-                     </div>
-                  </div>
-               )}
-
                {/* TEMA: SEGURIDAD */}
                {activeTab === 'IDENTITY' && (
                   <div className="space-y-8 animate-in slide-in-from-bottom-4">
                      <div className="bg-white p-10 rounded-[48px] border-2 border-slate-100 shadow-sm space-y-8">
-
                         <div className="flex justify-between items-center">
                            <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-3"><Key size={20} className="text-indigo-600" /> Códigos de Acceso (PIN)</h3>
                            <span className="text-[9px] font-black text-rose-500 bg-rose-50 px-3 py-1 rounded-full uppercase">Cifrado de 4 Dígitos</span>
@@ -407,112 +297,21 @@ export const AdminControlPanel: React.FC<Props> = ({ data, onUpdateConfig, onRes
                                  />
                                  <span className="font-bold text-slate-300 text-xs">€</span>
                               </div>
-                              <div className="flex bg-slate-100 rounded-xl overflow-hidden shadow-sm border border-slate-200 ml-2">
-                                 <button onClick={() => setEditingRecipeFor(i)} className={`p-3 flex items-center gap-2 hover:bg-indigo-50 hover:text-indigo-600 transition-all ${item.recipe && item.recipe.length > 0 ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400'}`}>
-                                    <FlaskConical size={16} />
-                                 </button>
-                                 <button onClick={() => removePrice(item)} className="p-3 text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all border-l border-slate-200">
-                                    <Trash2 size={16} />
-                                 </button>
-                              </div>
+
+                              {/* KIOSK CATEGORY SELECTOR */}
+                              <select
+                                 value={getKioskCategory(item.name)}
+                                 onChange={e => updateKioskCategory(item.name, e.target.value)}
+                                 className="bg-white border-2 border-slate-100 rounded-xl px-2 py-2 text-[10px] font-black uppercase outline-none focus:border-indigo-500 w-24 md:w-32"
+                              >
+                                 <option value="NONE">🚫 Oculto</option>
+                                 <option value="ALCOHOL">🍷 Copas</option>
+                                 <option value="REFRESCO">🥤 Refrescos</option>
+                                 <option value="OTRO">🥣 Vasos</option>
+                              </select>
+                              <button onClick={() => removePrice(item)} className="p-3 text-slate-200 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"><Trash2 size={16} /></button>
                            </div>
                         ))}
-                     </div>
-                  </div>
-               )}
-
-               {/* MODAL ESCANDALLO (RECIPE BUILDER) */}
-               {editingRecipeFor !== null && currentEditingPrice && (
-                  <div className="fixed inset-0 z-[200] bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-4">
-                     <div className="bg-white w-full max-w-2xl rounded-[48px] shadow-2xl p-8 md:p-12 animate-in zoom-in-95 relative border-2 border-indigo-100">
-                        <button onClick={() => setEditingRecipeFor(null)} className="absolute top-8 right-8 p-3 bg-slate-100 hover:bg-slate-200 rounded-full transition-all"><X size={20} /></button>
-
-                        <div className="flex items-center gap-4 mb-8">
-                           <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center border border-indigo-100">
-                              <Beaker size={32} className="text-indigo-600" />
-                           </div>
-                           <div>
-                              <p className="text-[10px] font-black tracking-widest text-indigo-400 uppercase">Calculadora de Escandallo</p>
-                              <h3 className="text-3xl font-black text-slate-900 uppercase italic tracking-tighter">{currentEditingPrice.name}</h3>
-                           </div>
-                        </div>
-
-                        {/* KPIS RENTABILIDAD */}
-                        <div className="grid grid-cols-3 gap-4 mb-8">
-                           <div className="bg-slate-50 p-6 rounded-[24px] text-center border border-slate-100 shadow-sm">
-                              <p className="text-[9px] font-black text-slate-400 uppercase mb-1">PVP TPV</p>
-                              <p className="text-2xl font-black text-slate-900">{currentEditingPrice.price.toFixed(2)}€</p>
-                           </div>
-                           <div className="bg-rose-50/50 p-6 rounded-[24px] text-center border border-rose-100 shadow-sm">
-                              <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Coste Stock</p>
-                              <p className="text-2xl font-black text-rose-500">{getRecipeCost(currentEditingPrice.recipe).toFixed(2)}€</p>
-                           </div>
-                           <div className="bg-emerald-50/50 p-6 rounded-[24px] text-center border border-emerald-100 shadow-sm relative overflow-hidden">
-                              <p className="text-[9px] font-black text-emerald-600/60 uppercase mb-1">Beneficio</p>
-                              <p className="text-2xl font-black text-emerald-600 relative z-10">
-                                 {(currentEditingPrice.price - getRecipeCost(currentEditingPrice.recipe)).toFixed(2)}€
-                              </p>
-                              <div className="absolute right-0 bottom-0 text-emerald-600/10 font-black text-4xl -mr-2 -mb-2">
-                                 {currentEditingPrice.price > 0 ? (((currentEditingPrice.price - getRecipeCost(currentEditingPrice.recipe)) / currentEditingPrice.price) * 100).toFixed(0) : 0}%
-                              </div>
-                           </div>
-                        </div>
-
-                        {/* AÑADIR STOCK */}
-                        <div className="flex flex-col md:flex-row gap-3 mb-6 bg-indigo-50 p-3 rounded-[24px] border border-indigo-100">
-                           <select
-                              value={recipeBuilderItem.stockItemId}
-                              onChange={e => setRecipeBuilderItem({ ...recipeBuilderItem, stockItemId: e.target.value })}
-                              className="flex-1 p-4 bg-white rounded-xl font-bold text-xs uppercase outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
-                           >
-                              <option value="">Seleccionar producto de stock...</option>
-                              {data.stock.filter(s => s.usageType === 'VENTA').map(s => (
-                                 <option key={s.id} value={s.id}>{s.name} ({s.costPerUnit}€ / {s.unit})</option>
-                              ))}
-                           </select>
-                           <div className="flex gap-2">
-                              <input
-                                 type="number" step="0.01"
-                                 value={recipeBuilderItem.quantity}
-                                 onChange={e => setRecipeBuilderItem({ ...recipeBuilderItem, quantity: e.target.value })}
-                                 className="w-24 p-4 bg-white rounded-xl font-black text-center text-indigo-600 outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
-                                 placeholder="Cant."
-                              />
-                              <button onClick={handleAddRecipeItem} disabled={!recipeBuilderItem.stockItemId} className="px-6 bg-indigo-600 text-white rounded-xl font-black shadow-md hover:bg-slate-900 active:scale-95 transition-all disabled:opacity-50">
-                                 <Plus size={20} />
-                              </button>
-                           </div>
-                        </div>
-
-                        {/* RECIPE LIST */}
-                        <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar border-t border-slate-100 pt-4">
-                           {(!currentEditingPrice.recipe || currentEditingPrice.recipe.length === 0) ? (
-                              <p className="text-center py-6 text-[10px] font-black uppercase tracking-widest text-slate-300">Sin ingredientes asignados.<br /> Todo el PVP es Beneficio Puro (100%).</p>
-                           ) : (
-                              currentEditingPrice.recipe.map(r => {
-                                 const stockItem = data.stock.find(s => s.id === r.stockItemId);
-                                 const cost = stockItem ? stockItem.costPerUnit * r.quantity : 0;
-                                 return (
-                                    <div key={r.stockItemId} className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-100 group hover:shadow-md transition-all">
-                                       <div>
-                                          <p className="text-xs font-black uppercase text-slate-800">{r.stockItemName}</p>
-                                          <p className="text-[10px] font-bold text-slate-400">{r.quantity} {stockItem?.unit || 'u'} a {stockItem?.costPerUnit || 0}€/{stockItem?.unit || 'u'}</p>
-                                       </div>
-                                       <div className="flex items-center gap-4">
-                                          <span className="text-sm font-black text-rose-500">{cost.toFixed(2)}€</span>
-                                          <button onClick={() => handleRemoveRecipeItem(r.stockItemId)} className="p-2 text-slate-300 hover:bg-rose-100 hover:text-rose-600 rounded-xl transition-colors">
-                                             <Trash2 size={16} />
-                                          </button>
-                                       </div>
-                                    </div>
-                                 );
-                              })
-                           )}
-                        </div>
-
-                        <button onClick={() => setEditingRecipeFor(null)} className="w-full mt-6 py-5 bg-slate-900 text-white rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl hover:bg-slate-800 active:scale-[0.98] transition-all">
-                           Cerrar Calculadora
-                        </button>
                      </div>
                   </div>
                )}
@@ -535,220 +334,187 @@ export const AdminControlPanel: React.FC<Props> = ({ data, onUpdateConfig, onRes
                      </div>
 
                      <div className="p-10 space-y-8">
-                        {activeMaster === 'STOCK' ? (
-                           <div className="space-y-6">
-                              <p className="text-[11px] text-slate-500 font-black uppercase tracking-widest bg-slate-100 p-4 rounded-3xl inline-block">Activa, edita o crea nuevas categorías de stock libremente.</p>
+                        <div className="flex gap-2">
+                           <input
+                              value={newVal}
+                              onChange={e => setNewVal(e.target.value)}
+                              onKeyDown={e => e.key === 'Enter' && handleMasterAdd(({ SUPPLIERS: 'supplierCategories', BUDGET: 'budgetCategories', STOCK: 'stockCategories', UNITS: 'units', LOCATIONS: 'locations' }[activeMaster] as any))}
+                              placeholder={`Nueva entrada para ${activeMaster.toLowerCase()}...`}
+                              className="flex-1 p-5 bg-slate-50 border-2 border-transparent rounded-[24px] font-bold outline-none focus:bg-white focus:border-indigo-300 shadow-inner"
+                           />
+                           <button
+                              onClick={() => handleMasterAdd(({ SUPPLIERS: 'supplierCategories', BUDGET: 'budgetCategories', STOCK: 'stockCategories', UNITS: 'units', LOCATIONS: 'locations' }[activeMaster] as any))}
+                              className="px-10 bg-slate-900 text-white rounded-[24px] font-black uppercase text-xs tracking-widest hover:bg-indigo-600 transition-all shadow-lg"
+                           >Añadir</button>
+                        </div>
 
-                              <div className="flex gap-2">
-                                 <input
-                                    value={newVal}
-                                    onChange={e => setNewVal(e.target.value)}
-                                    onKeyDown={e => {
-                                       if (e.key === 'Enter' && newVal.trim()) {
-                                          const newId = newVal.trim().toUpperCase().replace(/\s+/g, '_');
-                                          if (!config.stockCategoryDefs?.find(d => d.id === newId)) {
-                                             setConfig({
-                                                ...config,
-                                                stockCategoryDefs: [...(config.stockCategoryDefs || []), { id: newId, name: newVal.trim(), icon: 'Box', subcategories: [] }],
-                                                stockCategories: [...config.stockCategories, newId]
-                                             });
-                                             setNewVal('');
-                                          }
-                                       }
-                                    }}
-                                    placeholder="Nueva Categoría Principal..."
-                                    className="flex-1 p-5 bg-slate-50 border-2 border-transparent rounded-[24px] font-bold outline-none focus:bg-white focus:border-indigo-300 shadow-inner"
-                                 />
-                                 <button
-                                    onClick={() => {
-                                       if (newVal.trim()) {
-                                          const newId = newVal.trim().toUpperCase().replace(/\s+/g, '_');
-                                          if (!config.stockCategoryDefs?.find(d => d.id === newId)) {
-                                             setConfig({
-                                                ...config,
-                                                stockCategoryDefs: [...(config.stockCategoryDefs || []), { id: newId, name: newVal.trim(), icon: 'Box', subcategories: [] }],
-                                                stockCategories: [...config.stockCategories, newId]
-                                             });
-                                             setNewVal('');
-                                          }
-                                       }
-                                    }}
-                                    className="px-10 bg-slate-900 text-white rounded-[24px] font-black uppercase text-xs tracking-widest hover:bg-indigo-600 transition-all shadow-lg"
-                                 >Añadir Principal</button>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                           {(config[{ SUPPLIERS: 'supplierCategories', BUDGET: 'budgetCategories', STOCK: 'stockCategories', UNITS: 'units', LOCATIONS: 'locations' }[activeMaster] as keyof AppConfig] as string[]).map(item => (
+                              <div key={item} className="p-6 bg-white border-2 border-slate-50 rounded-[32px] flex justify-between items-center group hover:border-indigo-100 transition-all shadow-sm">
+                                 <span className="font-bold text-slate-800 text-sm uppercase italic tracking-tighter">{item}</span>
+                                 <button onClick={() => handleMasterRemove(({ SUPPLIERS: 'supplierCategories', BUDGET: 'budgetCategories', STOCK: 'stockCategories', UNITS: 'units', LOCATIONS: 'locations' }[activeMaster] as any), item)} className="p-3 text-slate-200 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"><X size={16} /></button>
                               </div>
+                           ))}
+                        </div>
+                     </div>
+                  </div>
+               )}
 
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                 {(config.stockCategoryDefs || PREDEFINED_STOCK_CATEGORIES).map(cat => {
-                                    const isActive = config.stockCategories.includes(cat.id);
+               {/* TEMA: PERMISOS CUSTOM POR USUARIO */}
+               {activeTab === 'PERMISSIONS' && (() => {
+                  const customPerms: CustomPermission[] = data.customPermissions || [];
+                  const allModules = getAllModules();
+
+                  const handleTogglePermission = (userId: string, moduleId: string) => {
+                     const userPerms = customPerms.find(p => p.userId === userId);
+                     let newCustomPerms: CustomPermission[];
+
+                     if (!userPerms) {
+                        // Create new permission entry
+                        newCustomPerms = [...customPerms, { userId, extraModules: [moduleId] }];
+                     } else {
+                        const hasPermission = userPerms.extraModules.includes(moduleId);
+                        if (hasPermission) {
+                           // Remove permission
+                           const newExtraModules = userPerms.extraModules.filter(m => m !== moduleId);
+                           if (newExtraModules.length === 0) {
+                              // Remove user entry if no more custom perms
+                              newCustomPerms = customPerms.filter(p => p.userId !== userId);
+                           } else {
+                              newCustomPerms = customPerms.map(p =>
+                                 p.userId === userId ? { ...p, extraModules: newExtraModules } : p
+                              );
+                           }
+                        } else {
+                           // Add permission
+                           newCustomPerms = customPerms.map(p =>
+                              p.userId === userId ? { ...p, extraModules: [...p.extraModules, moduleId] } : p
+                           );
+                        }
+                     }
+
+                     onUpdateData({ customPermissions: newCustomPerms });
+                  };
+
+                  const getUserPermissions = (userId: string, userRole: string) => {
+                     const basePerms = ROLE_PERMISSIONS[userRole as UserRole] || [];
+                     const customPerm = customPerms.find(p => p.userId === userId);
+                     return {
+                        base: basePerms.includes('*') ? allModules.map(m => m.id) : basePerms,
+                        custom: customPerm?.extraModules || []
+                     };
+                  };
+
+                  return (
+                     <div className="space-y-8 animate-in slide-in-from-bottom-4">
+                        <div className="bg-white p-10 rounded-[48px] border-2 border-slate-100 shadow-sm space-y-8">
+                           <div className="flex justify-between items-center">
+                              <div>
+                                 <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-3">
+                                    <UserCog size={20} className="text-indigo-600" /> Gestión de Permisos Personalizados
+                                 </h3>
+                                 <p className="text-xs text-slate-500 mt-2">Otorga acceso a módulos específicos más allá de los permisos del rol base</p>
+                              </div>
+                           </div>
+
+                           {data.members.length === 0 ? (
+                              <div className="text-center py-12 bg-slate-50 rounded-3xl">
+                                 <Users size={48} className="mx-auto text-slate-300 mb-4" />
+                                 <p className="text-slate-400 font-bold">No hay miembros registrados</p>
+                                 <p className="text-xs text-slate-300 mt-2">Añade miembros primero en el módulo de Censo</p>
+                              </div>
+                           ) : (
+                              <div className="space-y-4">
+                                 {data.members.slice(0, 20).map(member => {
+                                    const permissions = getUserPermissions(member.id, member.role);
+                                    const customCount = permissions.custom.length;
+
                                     return (
-                                       <div key={cat.id} className={`p-6 border-2 rounded-[32px] flex flex-col gap-4 transition-all shadow-sm ${isActive ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-100 opacity-60 hover:opacity-100 hover:border-indigo-100 block'}`}>
-                                          <div className="flex justify-between items-center">
-                                             <div className="flex items-center gap-3">
-                                                <span className={`font-black text-sm uppercase tracking-tighter ${isActive ? 'text-indigo-800' : 'text-slate-600'}`}>{cat.name}</span>
+                                       <div key={member.id} className="border-2 border-slate-100 rounded-3xl p-6 space-y-4 hover:border-indigo-100 transition-all">
+                                          {/* Member Header */}
+                                          <div className="flex items-start justify-between">
+                                             <div className="flex-1">
+                                                <h4 className="font-black text-lg text-slate-800">{member.name}</h4>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                   <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">
+                                                      {getRoleLabel(member.role as UserRole)}
+                                                   </span>
+                                                   {customCount > 0 && (
+                                                      <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
+                                                         +{customCount} permisos custom
+                                                      </span>
+                                                   )}
+                                                </div>
                                              </div>
-                                             <button onClick={() => {
-                                                if (isActive) {
-                                                   setConfig({ ...config, stockCategories: config.stockCategories.filter(id => id !== cat.id) });
-                                                } else {
-                                                   setConfig({ ...config, stockCategories: [...config.stockCategories, cat.id] });
-                                                }
-                                             }} className={`p-2 rounded-xl border-2 transition-all ${isActive ? 'bg-indigo-600 border-indigo-600 text-white shadow-md scale-110' : 'bg-white border-slate-200 text-slate-400'}`}>
-                                                <CheckCircle2 size={16} />
+                                             <button
+                                                onClick={() => setSelectedUserId(selectedUserId === member.id ? null : member.id)}
+                                                className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs hover:bg-indigo-700 transition-all"
+                                             >
+                                                {selectedUserId === member.id ? 'Cerrar' : 'Gestionar'}
                                              </button>
                                           </div>
-                                          {isActive && (
-                                             <div className="flex flex-col gap-3 mt-2">
-                                                <div className="flex flex-wrap gap-2">
-                                                   {cat.subcategories.map(sub => (
-                                                      <span key={sub.id} className="text-[9px] font-black bg-white text-indigo-600 pl-3 pr-1 py-1 rounded-full border border-indigo-100 uppercase tracking-widest shadow-sm flex items-center gap-1">
-                                                         {sub.name}
-                                                         <button onClick={() => {
-                                                            const newCatDefs = (config.stockCategoryDefs || PREDEFINED_STOCK_CATEGORIES).map(c =>
-                                                               c.id === cat.id ? { ...c, subcategories: c.subcategories.filter(s => s.id !== sub.id) } : c
-                                                            );
-                                                            setConfig({ ...config, stockCategoryDefs: newCatDefs });
-                                                         }} className="p-1 hover:bg-rose-50 hover:text-rose-600 rounded-full transition-colors"><X size={10} /></button>
-                                                      </span>
-                                                   ))}
-                                                </div>
-                                                <div className="flex gap-2">
-                                                   <input
-                                                      value={newSubcat[cat.id] || ''}
-                                                      onChange={e => setNewSubcat({ ...newSubcat, [cat.id]: e.target.value })}
-                                                      onKeyDown={e => {
-                                                         if (e.key === 'Enter' && newSubcat[cat.id]?.trim()) {
-                                                            const sName = newSubcat[cat.id].trim();
-                                                            const sId = sName.toUpperCase().replace(/\s+/g, '_');
-                                                            const newCatDefs = (config.stockCategoryDefs || PREDEFINED_STOCK_CATEGORIES).map(c =>
-                                                               c.id === cat.id ? { ...c, subcategories: [...c.subcategories, { id: sId, name: sName }] } : c
-                                                            );
-                                                            setConfig({ ...config, stockCategoryDefs: newCatDefs });
-                                                            setNewSubcat({ ...newSubcat, [cat.id]: '' });
-                                                         }
-                                                      }}
-                                                      placeholder="Nueva subcategoría..."
-                                                      className="flex-1 text-[10px] font-bold py-2 px-3 bg-white border border-indigo-100 rounded-xl outline-none focus:border-indigo-400"
-                                                   />
-                                                   <button onClick={() => {
-                                                      if (newSubcat[cat.id]?.trim()) {
-                                                         const sName = newSubcat[cat.id].trim();
-                                                         const sId = sName.toUpperCase().replace(/\s+/g, '_');
-                                                         const newCatDefs = (config.stockCategoryDefs || PREDEFINED_STOCK_CATEGORIES).map(c =>
-                                                            c.id === cat.id ? { ...c, subcategories: [...c.subcategories, { id: sId, name: sName }] } : c
-                                                         );
-                                                         setConfig({ ...config, stockCategoryDefs: newCatDefs });
-                                                         setNewSubcat({ ...newSubcat, [cat.id]: '' });
-                                                      }
-                                                   }}
-                                                      className="bg-indigo-100 text-indigo-600 px-3 rounded-xl font-bold hover:bg-indigo-600 hover:text-white transition-colors"
-                                                   >
-                                                      <Plus size={14} />
-                                                   </button>
-                                                </div>
+
+                                          {/* Module Grid (Expanded) */}
+                                          {selectedUserId === member.id && (
+                                             <div className="pt-4 border-t border-slate-100 space-y-4 animate-in slide-in-from-top-2">
+                                                {['economy', 'supply', 'ops', 'tools'].map(category => {
+                                                   const categoryModules = allModules.filter(m => m.category === category);
+                                                   if (categoryModules.length === 0) return null;
+
+                                                   return (
+                                                      <div key={category} className="space-y-2">
+                                                         <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                                            {category === 'economy' ? '💰 Economía' : category === 'supply' ? '📦 Logística' : category === 'ops' ? '⚙️ Operativa' : '🛠️ Utilidades'}
+                                                         </h5>
+                                                         <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                                            {categoryModules.map(module => {
+                                                               const hasBase = permissions.base.includes('*') || permissions.base.includes(module.id);
+                                                               const hasCustom = permissions.custom.includes(module.id);
+
+                                                               return (
+                                                                  <button
+                                                                     key={module.id}
+                                                                     onClick={() => !hasBase && handleTogglePermission(member.id, module.id)}
+                                                                     disabled={hasBase}
+                                                                     className={`p-3 rounded-xl text-left text-xs font-bold transition-all ${hasBase
+                                                                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                                                        : hasCustom
+                                                                           ? 'bg-emerald-500 text-white shadow-lg border-2 border-emerald-600'
+                                                                           : 'bg-white border-2 border-slate-200 text-slate-700hover:border-indigo-400 hover:bg-indigo-50'
+                                                                        }`}
+                                                                  >
+                                                                     <div className="flex items-center justify-between">
+                                                                        <span>{module.label}</span>
+                                                                        {hasBase && <span className="text-[9px] opacity-60">BASE</span>}
+                                                                        {hasCustom && <CheckCircle2 size={14} />}
+                                                                     </div>
+                                                                  </button>
+                                                               );
+                                                            })}
+                                                         </div>
+                                                      </div>
+                                                   );
+                                                })}
                                              </div>
                                           )}
                                        </div>
-                                    )
+                                    );
                                  })}
                               </div>
-                           </div>
-                        ) : (
-                           <>
-                              <div className="flex gap-2">
-                                 <input
-                                    value={newVal}
-                                    onChange={e => setNewVal(e.target.value)}
-                                    onKeyDown={e => e.key === 'Enter' && handleMasterAdd(({ SUPPLIERS: 'supplierCategories', BUDGET: 'budgetCategories', UNITS: 'units', LOCATIONS: 'locations' } as any)[activeMaster])}
-                                    placeholder={`Nueva entrada para ${activeMaster.toLowerCase()}...`}
-                                    className="flex-1 p-5 bg-slate-50 border-2 border-transparent rounded-[24px] font-bold outline-none focus:bg-white focus:border-indigo-300 shadow-inner"
-                                 />
-                                 <button
-                                    onClick={() => handleMasterAdd(({ SUPPLIERS: 'supplierCategories', BUDGET: 'budgetCategories', UNITS: 'units', LOCATIONS: 'locations' } as any)[activeMaster])}
-                                    className="px-10 bg-slate-900 text-white rounded-[24px] font-black uppercase text-xs tracking-widest hover:bg-indigo-600 transition-all shadow-lg"
-                                 >Añadir</button>
-                              </div>
-
-                              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                 {(((config as any)[({ SUPPLIERS: 'supplierCategories', BUDGET: 'budgetCategories', UNITS: 'units', LOCATIONS: 'locations' } as any)[activeMaster]] as string[]) || []).map((item: string) => (
-                                    <div key={item} className="p-6 bg-white border-2 border-slate-50 rounded-[32px] flex justify-between items-center group hover:border-indigo-100 transition-all shadow-sm">
-                                       <span className="font-bold text-slate-800 text-sm uppercase italic tracking-tighter">{item}</span>
-                                       <button onClick={() => handleMasterRemove(({ SUPPLIERS: 'supplierCategories', BUDGET: 'budgetCategories', UNITS: 'units', LOCATIONS: 'locations' } as any)[activeMaster], item)} className="p-3 text-slate-200 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"><X size={16} /></button>
-                                    </div>
-                                 ))}
-                              </div>
-                           </>
-                        )}
-                     </div>
-                  </div>
-               )}
-
-               {/* TEMA: PERMISOS POR ROL */}
-               {activeTab === 'PERMISOS' && (
-                  <div className="bg-white p-8 rounded-[48px] border-2 border-slate-100 shadow-sm animate-in slide-in-from-bottom-4">
-                     <RolePermissionsPanel
-                        config={data.appConfig}
-                        onUpdateConfig={onUpdateConfig}
-                     />
-                  </div>
-               )}
-
-               {/* TEMA: SYNC / BACKUPS */}
-               {activeTab === 'SYNC' && (
-                  <div className="animate-in slide-in-from-bottom-4 h-full space-y-6">
-
-                     {/* Panel de Copias de Seguridad */}
-                     <div className="bg-slate-900 p-8 rounded-[40px] border border-slate-800 text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl relative overflow-hidden">
-                        <div className="absolute -right-10 opacity-5 pointer-events-none"><DownloadCloud size={200} /></div>
-                        <div className="relative z-10 w-full md:w-auto">
-                           <h3 className="font-black text-2xl flex items-center gap-3 uppercase italic tracking-tighter">
-                              <ShieldCheck className="text-emerald-400" size={28} /> Bóveda de Backups
-                           </h3>
-                           <p className="text-slate-400 text-sm mt-2 font-medium max-w-sm">Genera una copia de seguridad instantánea ("Snapshot") de <b>TODA</b> la Falla en este exacto segundo. El sistema también hace copias automáticas a las <span className="text-emerald-400">04:00 AM</span>.</p>
+                           )}
                         </div>
-                        <button
-                           disabled={isBackingUp}
-                           onClick={createManualBackup}
-                           className="w-full md:w-auto bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-black px-8 py-5 rounded-[24px] flex items-center justify-center gap-2 whitespace-nowrap shadow-[0_0_30px_rgba(16,185,129,0.3)] transition-all active:scale-95 disabled:opacity-50 relative z-10 text-xs uppercase tracking-widest"
-                        >
-                           {isBackingUp ? <RefreshCw className="animate-spin" size={20} /> : <DownloadCloud size={20} />}
-                           Crear INSTANTÁNEA NOW
-                        </button>
                      </div>
+                  );
+               })()}
 
-                     {/* Historial de Backups */}
-                     <div className="bg-white p-8 rounded-[40px] border-2 border-slate-100 shadow-sm space-y-4">
-                        <h4 className="font-black text-slate-800 uppercase text-xs tracking-widest mb-6">Historial y Restauración</h4>
-                        {backups.length === 0 ? (
-                           <div className="p-8 text-center text-slate-400 bg-slate-50 rounded-3xl font-bold uppercase text-xs tracking-widest">No hay copias de seguridad aún</div>
-                        ) : (
-                           <div className="grid gap-3">
-                              {backups.map(b => (
-                                 <div key={b.id} className="flex flex-col md:flex-row items-start md:items-center justify-between p-5 bg-slate-50 border border-slate-200 rounded-3xl hover:bg-white transition-colors group">
-                                    <div className="mb-4 md:mb-0">
-                                       <div className="flex items-center gap-2 mb-1">
-                                          <Database size={14} className="text-indigo-500" />
-                                          <span className="font-black text-slate-800 tracking-tight text-sm">
-                                             {new Date(b.timestamp).toLocaleString('es-ES', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).toUpperCase()}
-                                          </span>
-                                       </div>
-                                       <div className="flex gap-2">
-                                          <span className="text-[9px] font-black uppercase tracking-widest bg-slate-200 text-slate-500 px-2 py-1 rounded-md">ID: {b.id.substring(0, 6)}...</span>
-                                          <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${b.trigger === 'AUTO_NIGHT_BACKUP' ? 'bg-indigo-100 text-indigo-600' : 'bg-orange-100 text-orange-600'}`}>
-                                             {b.trigger === 'AUTO_NIGHT_BACKUP' ? 'Auto Cierre (4AM)' : 'Admin Manual'}
-                                          </span>
-                                       </div>
-                                    </div>
-                                    <button
-                                       onClick={() => restoreBackup(b.data)}
-                                       className="w-full md:w-auto px-6 py-3 bg-white border-2 border-rose-100 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex justify-center items-center gap-2 transition-all opacity-80 group-hover:opacity-100"
-                                    >
-                                       <RefreshCw size={14} /> Restaurar Falla a la Copia
-                                    </button>
-                                 </div>
-                              ))}
-                           </div>
-                        )}
-                     </div>
+               {/* TEMA: SYNC / NUBE MANUAL */}
+               {activeTab === 'SYNC' && (
+                  <div className="animate-in slide-in-from-bottom-4 h-full">
+                     {onFullImport ? (
+                        <SyncModules data={data} onImport={onFullImport} />
+                     ) : (
+                        <div className="p-10 text-center bg-slate-50 rounded-[40px]">Error: Módulo de sincronización no disponible.</div>
+                     )}
                   </div>
                )}
 
@@ -764,22 +530,22 @@ export const AdminControlPanel: React.FC<Props> = ({ data, onUpdateConfig, onRes
                      </div>
 
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <button onClick={() => setPendingDangerAction({ title: 'Resetear Censo', message: 'Se borrarán TODOS los falleros, sus misiones y registros de presencia. Esta acción es IRREVERSIBLE.', confirmWord: 'CONFIRMAR', onConfirm: () => onResetModule('members') })} className="p-8 bg-white border-2 border-rose-100 rounded-[40px] text-left hover:border-rose-500 group transition-all shadow-sm hover:shadow-xl">
+                        <button onClick={() => confirm('¿Purgar censo completo?') && onResetModule('members')} className="p-8 bg-white border-2 border-rose-100 rounded-[40px] text-left hover:border-rose-500 group transition-all shadow-sm hover:shadow-xl">
                            <Users className="text-rose-400 group-hover:text-rose-600 mb-4" size={32} />
                            <h4 className="font-black uppercase text-xs tracking-widest text-slate-800">Resetear Censo</h4>
                            <p className="text-[10px] text-slate-400 font-medium mt-2 italic leading-relaxed">Borra a todos los falleros, sus misiones y registros de presencia.</p>
                         </button>
-                        <button onClick={() => setPendingDangerAction({ title: 'Resetear Caja', message: 'Se borrará TODO el historial de ingresos, gastos y el saldo actual de tesorería. Esta acción es IRREVERSIBLE.', confirmWord: 'CONFIRMAR', onConfirm: () => onResetModule('transactions') })} className="p-8 bg-white border-2 border-rose-100 rounded-[40px] text-left hover:border-rose-500 group transition-all shadow-sm hover:shadow-xl">
+                        <button onClick={() => confirm('¿Borrar toda la contabilidad?') && onResetModule('transactions')} className="p-8 bg-white border-2 border-rose-100 rounded-[40px] text-left hover:border-rose-500 group transition-all shadow-sm hover:shadow-xl">
                            <Wallet className="text-rose-400 group-hover:text-rose-600 mb-4" size={32} />
                            <h4 className="font-black uppercase text-xs tracking-widest text-slate-800">Resetear Caja</h4>
                            <p className="text-[10px] text-slate-400 font-medium mt-2 italic leading-relaxed">Limpia el historial de ingresos, gastos y el saldo actual de tesorería.</p>
                         </button>
-                        <button onClick={() => setPendingDangerAction({ title: 'Limpiar Tareas', message: 'Se eliminará TODO el tablero logístico y las sub-misiones activas. Esta acción es IRREVERSIBLE.', confirmWord: 'CONFIRMAR', onConfirm: () => onResetModule('tasks') })} className="p-8 bg-white border-2 border-rose-100 rounded-[40px] text-left hover:border-rose-500 group transition-all shadow-sm hover:shadow-xl">
+                        <button onClick={() => confirm('¿Limpiar tablero de tareas?') && onResetModule('tasks')} className="p-8 bg-white border-2 border-rose-100 rounded-[40px] text-left hover:border-rose-500 group transition-all shadow-sm hover:shadow-xl">
                            <ClipboardList className="text-rose-400 group-hover:text-rose-600 mb-4" size={32} />
                            <h4 className="font-black uppercase text-xs tracking-widest text-slate-800">Limpiar Tareas</h4>
                            <p className="text-[10px] text-slate-400 font-medium mt-2 italic leading-relaxed">Elimina todo el tablero logístico y las sub-misiones activas.</p>
                         </button>
-                        <button onClick={() => setPendingDangerAction({ title: 'Vaciar Inventario', message: 'Se borrarán TODOS los artículos registrados en las bodegas de Venta y Casal. Esta acción es IRREVERSIBLE.', confirmWord: 'CONFIRMAR', onConfirm: () => onResetModule('stock') })} className="p-8 bg-white border-2 border-rose-100 rounded-[40px] text-left hover:border-rose-500 group transition-all shadow-sm hover:shadow-xl">
+                        <button onClick={() => confirm('¿Purgar almacenes e inventario?') && onResetModule('stock')} className="p-8 bg-white border-2 border-rose-100 rounded-[40px] text-left hover:border-rose-500 group transition-all shadow-sm hover:shadow-xl">
                            <Box className="text-rose-400 group-hover:text-rose-600 mb-4" size={32} />
                            <h4 className="font-black uppercase text-xs tracking-widest text-slate-800">Vaciar Inventario</h4>
                            <p className="text-[10px] text-slate-400 font-medium mt-2 italic leading-relaxed">Borra todos los artículos registrados en las bodegas de Venta y Casal.</p>
@@ -787,7 +553,7 @@ export const AdminControlPanel: React.FC<Props> = ({ data, onUpdateConfig, onRes
                      </div>
 
                      <div className="pt-8 border-t border-rose-200">
-                        <button onClick={() => setPendingDangerAction({ title: 'HARD RESET GLOBAL', message: '⚠️ ESTO BORRARÁ ABSOLUTAMENTE TODO: censo, tesorería, stock, tareas, pedidos, sesiones de barra, log de auditoría... TODOS los datos se eliminarán de Firebase PERMANENTEMENTE. La app volverá al estado de fábrica. ¿Estás ABSOLUTAMENTE seguro?', confirmWord: 'BORRAR TODO', onConfirm: () => { onHardReset?.(); } })} className="w-full py-8 bg-rose-600 text-white rounded-[40px] font-black uppercase text-sm tracking-[0.2em] shadow-2xl flex items-center justify-center gap-4 hover:bg-rose-700 transition-all border-b-8 border-rose-900 active:translate-y-2 active:border-b-0">
+                        <button onClick={() => confirm('⚠️⚠️⚠️ ESTO BORRARÁ TODO EL EJERCICIO PARA EMPEZAR DE CERO. ¿ESTÁS SEGURO?') && window.location.reload()} className="w-full py-8 bg-rose-600 text-white rounded-[40px] font-black uppercase text-sm tracking-[0.2em] shadow-2xl flex items-center justify-center gap-4 hover:bg-rose-700 transition-all border-b-8 border-rose-900 active:translate-y-2 active:border-b-0">
                            <RefreshCw size={24} className="animate-spin-slow" /> HARD RESET GLOBAL DEL SISTEMA
                         </button>
                      </div>
@@ -838,15 +604,6 @@ export const AdminControlPanel: React.FC<Props> = ({ data, onUpdateConfig, onRes
         .animate-spin-slow { animation: spin 8s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
-
-         <ConfirmModal
-            isOpen={!!pendingDangerAction}
-            title={pendingDangerAction?.title || ''}
-            message={pendingDangerAction?.message || ''}
-            confirmWord={pendingDangerAction?.confirmWord || 'CONFIRMAR'}
-            onConfirm={() => { pendingDangerAction?.onConfirm(); setPendingDangerAction(null); }}
-            onCancel={() => setPendingDangerAction(null)}
-         />
-      </div >
+      </div>
    );
 };

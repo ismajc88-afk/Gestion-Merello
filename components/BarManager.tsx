@@ -1,11 +1,11 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Shift, ShiftTime, Member, UserRole } from '../types';
 import { 
-  Users, Sparkles, Clock, Sun, Moon, Sunset, 
+  Sparkles, Sun, Moon, Sunset, 
   Plus, X, Trash2, Activity, ChevronLeft, ChevronRight,
-  Award, BatteryFull, BatteryLow, BatteryMedium, Cpu,
-  Fingerprint, Flame, HeartPulse, Trophy, Calendar
+  
+  Fingerprint
 } from 'lucide-react';
 
 interface Props {
@@ -25,7 +25,7 @@ export const BarManager: React.FC<Props> = ({ shifts, members, onAutoAssign, onU
 
   const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
   const [showStats, setShowStats] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [, setCurrentTime] = useState(new Date());
   const [activeDateIndex, setActiveDateIndex] = useState(0);
   const [showAddDay, setShowAddDay] = useState(false);
   const [newDayDate, setNewDayDate] = useState(new Date().toISOString().split('T')[0]);

@@ -1,92 +1,37 @@
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
    LayoutDashboard, Wallet, ShoppingCart, Users, Beer,
    Calculator, Monitor, Settings, FileText,
    Truck, ClipboardList, Utensils, PieChart, ShoppingBag,
-   ChevronRight, Sparkles, LogOut, User as UserIcon, HelpCircle,
-   Boxes, Menu, X, Maximize, Minimize, HardHat, WifiOff
+   ChevronRight, LogOut, User as UserIcon, HelpCircle,
+   Boxes, Menu, X, Maximize, Minimize, HardHat
 } from 'lucide-react';
-import { UserRole, AppConfig } from '../types';
-import { usePermissions } from '../hooks/usePermissions';
+import { UserRole } from '../types';
+import { canAccessModule, getRoleLabel } from '../utils/permissions';
 
 interface LayoutProps {
    currentView: string;
    onChangeView: (view: string) => void;
    children: React.ReactNode;
-   onOpenAI: () => void;
    userRole: UserRole;
    onLogout: () => void;
    peerCount: number;
    onForceSync: () => void;
-   appConfig?: AppConfig;
 }
 
 export const Layout: React.FC<LayoutProps> = ({
-   currentView, onChangeView, children, onOpenAI, userRole, onLogout, peerCount, onForceSync, appConfig
+   currentView, onChangeView, children, userRole, onLogout, peerCount
 }) => {
    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
    const [isFullscreen, setIsFullscreen] = useState(false);
-   const [isOffline, setIsOffline] = useState(!navigator.onLine);
-
-   // --- PULL-TO-REFRESH ---
-   const scrollRef = useRef<HTMLDivElement>(null);
-   const [pullDistance, setPullDistance] = useState(0);
-   const [isRefreshing, setIsRefreshing] = useState(false);
-   const touchStartY = useRef(0);
-   const isPulling = useRef(false);
-   const PULL_THRESHOLD = 80;
-
-   const onTouchStart = useCallback((e: React.TouchEvent) => {
-      if (scrollRef.current && scrollRef.current.scrollTop <= 0) {
-         touchStartY.current = e.touches[0].clientY;
-         isPulling.current = true;
-      }
-   }, []);
-
-   const onTouchMove = useCallback((e: React.TouchEvent) => {
-      if (!isPulling.current) return;
-      const deltaY = e.touches[0].clientY - touchStartY.current;
-      if (deltaY > 0 && scrollRef.current && scrollRef.current.scrollTop <= 0) {
-         setPullDistance(Math.min(deltaY * 0.5, 120));
-      } else {
-         isPulling.current = false;
-         setPullDistance(0);
-      }
-   }, []);
-
-   const onTouchEnd = useCallback(() => {
-      if (pullDistance >= PULL_THRESHOLD && !isRefreshing) {
-         setIsRefreshing(true);
-         setPullDistance(PULL_THRESHOLD);
-         onForceSync();
-         setTimeout(() => {
-            setIsRefreshing(false);
-            setPullDistance(0);
-         }, 1500);
-      } else {
-         setPullDistance(0);
-      }
-      isPulling.current = false;
-   }, [pullDistance, isRefreshing, onForceSync]);
 
    useEffect(() => {
       const handleFullscreenChange = () => {
          setIsFullscreen(!!document.fullscreenElement);
       };
-
-      const handleOnline = () => setIsOffline(false);
-      const handleOffline = () => setIsOffline(true);
-
       document.addEventListener('fullscreenchange', handleFullscreenChange);
-      window.addEventListener('online', handleOnline);
-      window.addEventListener('offline', handleOffline);
-
-      return () => {
-         document.removeEventListener('fullscreenchange', handleFullscreenChange);
-         window.removeEventListener('online', handleOnline);
-         window.removeEventListener('offline', handleOffline);
-      };
+      return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
    }, []);
 
    const toggleFullscreen = () => {
@@ -100,27 +45,12 @@ export const Layout: React.FC<LayoutProps> = ({
       }
    };
 
-   // Resolve allowed views for this role using the new hook
-   const isAllowed = (id: string) => usePermissions(appConfig, userRole, id).canView;
-
    const getMenuItems = () => {
-      const common = [
+      // Full menu structure with all modules
+      const allModules = [
          { id: 'dashboard', label: 'Inicio', icon: LayoutDashboard },
          { id: 'help', label: 'Ayuda', icon: HelpCircle },
-      ].filter(i => isAllowed(i.id));
 
-      if (userRole === 'FALLERO') {
-         return [
-            ...common,
-            { id: 'bar', label: 'Turnos Barra', icon: Beer },
-            { id: 'work-groups', label: 'Grupos Trabajo', icon: HardHat },
-            { id: 'logistics', label: 'Mis Tareas', icon: ClipboardList },
-            { id: 'meals', label: 'Menús', icon: Utensils },
-         ].filter(i => 'type' in i || isAllowed(i.id));
-      }
-
-      const allItems = [
-         ...common,
          { id: 'economy', type: 'header', label: 'Economía' },
          { id: 'inventory', label: 'Presupuesto', icon: PieChart },
          { id: 'cash', label: 'Tesorería', icon: Wallet },
@@ -142,27 +72,27 @@ export const Layout: React.FC<LayoutProps> = ({
 
          { id: 'tools', type: 'header', label: 'Utilidades' },
          { id: 'tools', label: 'Calculadoras', icon: Calculator },
-         { id: 'kiosk', label: userRole === 'LOGISTICA' ? 'Panel Entregas Kanban' : 'Modo Kiosko', icon: Monitor },
+         { id: 'kiosk', label: 'Modo Kiosko', icon: Monitor },
          { id: 'settings-master', label: 'Ajustes', icon: Settings },
       ];
 
-      // Filter: keep header rows only if at least one item in their group is allowed
-      const filtered: typeof allItems = [];
-      for (let i = 0; i < allItems.length; i++) {
-         const item = allItems[i];
-         if ('type' in item && item.type === 'header') {
-            // Look ahead: keep header only if any next non-header item is allowed
-            const nextItems = allItems.slice(i + 1).filter(ni => !('type' in ni));
-            const nextHeader = allItems.slice(i + 1).findIndex(ni => 'type' in ni && ni.type === 'header');
-            const groupItems = nextHeader >= 0 ? nextItems.slice(0, nextHeader) : nextItems;
-            if (groupItems.some(gi => isAllowed(gi.id))) {
-               filtered.push(item);
-            }
-         } else if (isAllowed(item.id)) {
-            filtered.push(item);
+      // Filter modules based on role permissions
+      const filteredModules = allModules.filter(item => {
+         // Always keep headers for now (we'll clean empty ones later)
+         if (item.type === 'header') return true;
+         // Check if user has access to this module
+         return canAccessModule(userRole, item.id);
+      });
+
+      // Remove headers that have no items following them
+      return filteredModules.filter((item, index, arr) => {
+         if (item.type === 'header') {
+            const nextItem = arr[index + 1];
+            // Keep header only if next item exists and is not another header
+            return nextItem && nextItem.type !== 'header';
          }
-      }
-      return filtered;
+         return true;
+      });
    };
 
    const navItems = getMenuItems();
@@ -190,11 +120,18 @@ export const Layout: React.FC<LayoutProps> = ({
                <div className="p-6 bg-slate-50 border-b border-slate-100 safe-pt">
                   <div className="flex items-center gap-3 mb-3">
                      <img src="/escudo-merello.png" alt="Escudo Falla" className="w-12 h-12 object-contain" />
-                     <div>
+                     <div className="flex-1">
                         <h1 className="font-black text-xl tracking-tighter text-slate-900 italic">Merello<span className="text-blue-600">App</span></h1>
                         <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Gestión Fallera</p>
                      </div>
                   </div>
+
+                  {/* Role Badge */}
+                  <div className="px-3 py-2 bg-indigo-50 rounded-xl border border-indigo-100">
+                     <p className="text-[9px] font-black text-indigo-400 uppercase tracking-wider">Tu Rol</p>
+                     <p className="text-sm font-bold text-indigo-700">{getRoleLabel(userRole)}</p>
+                  </div>
+
                   <button onClick={() => setIsMobileMenuOpen(false)} className="absolute top-6 right-6 p-2 bg-white rounded-full shadow-sm text-slate-400 active:scale-90 transition-transform"><X size={24} /></button>
                </div>
 
@@ -270,12 +207,6 @@ export const Layout: React.FC<LayoutProps> = ({
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{peerCount + 1} Conectados</span>
                   <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
                </div>
-               {isOffline && (
-                  <div className="w-full flex items-center justify-center gap-2 py-2 bg-rose-50 border border-rose-200 rounded-xl text-[10px] font-black uppercase text-rose-600 shadow-inner">
-                     <WifiOff size={14} className="animate-pulse" />
-                     Guardando Local...
-                  </div>
-               )}
                <button onClick={toggleFullscreen} className="w-full flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900">
                   {isFullscreen ? <Minimize size={14} /> : <Maximize size={14} />} {isFullscreen ? 'Salir' : 'Pantalla Completa'}
                </button>
@@ -297,46 +228,17 @@ export const Layout: React.FC<LayoutProps> = ({
                   {(currentLabel as any)?.label || 'Merello'}
                </span>
                <div className="w-10 flex justify-end">
-                  {isOffline && <WifiOff size={20} className="text-rose-500 animate-pulse" />}
+                  {/* Spacer to center title or add right action */}
                </div>
             </header>
 
             {/* SCROLLABLE VIEW CONTAINER */}
-            <div
-               ref={scrollRef}
-               onTouchStart={onTouchStart}
-               onTouchMove={onTouchMove}
-               onTouchEnd={onTouchEnd}
-               className="flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-10 scroll-smooth relative"
-            >
-               {/* Pull indicator */}
-               {pullDistance > 0 && (
-                  <div className="flex justify-center items-center transition-all" style={{ height: pullDistance }}>
-                     <div className={`flex flex-col items-center gap-1 transition-transform ${isRefreshing ? 'animate-spin' : ''}`} style={{ transform: `rotate(${pullDistance * 3}deg)` }}>
-                        <div className={`w-8 h-8 rounded-full border-4 ${pullDistance >= PULL_THRESHOLD ? 'border-blue-500 border-t-transparent' : 'border-slate-300 border-t-transparent'}`}></div>
-                     </div>
-                     {!isRefreshing && pullDistance >= PULL_THRESHOLD && (
-                        <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest ml-3">Suelta para sincronizar</span>
-                     )}
-                     {isRefreshing && (
-                        <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest ml-3">Sincronizando...</span>
-                     )}
-                  </div>
-               )}
+            <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-10 scroll-smooth">
                <div className="max-w-7xl mx-auto h-full pb-32 lg:pb-0">
                   {children}
                </div>
             </div>
 
-            {/* AI FLOATING ACTION BUTTON (Mobile Optimized) */}
-            {isAllowed('ai') && (
-               <button
-                  onClick={onOpenAI}
-                  className="fixed bottom-6 right-4 md:bottom-10 md:right-10 w-14 h-14 md:w-16 md:h-16 bg-blue-600 text-white rounded-full shadow-[0_8px_30px_rgba(37,99,235,0.4)] flex items-center justify-center z-40 active:scale-90 transition-transform safe-mb"
-               >
-                  <Sparkles size={28} className="fill-white/20" />
-               </button>
-            )}
 
          </main>
       </div>

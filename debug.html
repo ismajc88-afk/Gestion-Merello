@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Merello Debugger</title>
+    <style>
+        body { background: #1e1e1e; color: #d4d4d4; font-family: monospace; padding: 20px; }
+        .log { border-bottom: 1px solid #333; padding: 5px 0; }
+        .error { color: #f48771; }
+        .warn { color: #cca700; }
+    </style>
+</head>
+<body>
+    <h1>Merello Console Debugger</h1>
+    <div id="logs"></div>
+    <script>
+        const logDiv = document.getElementById('logs');
+        function addLog(type, args) {
+            const el = document.createElement('div');
+            el.className = `log ${type}`;
+            el.textContent = `[${type.toUpperCase()}] ` + Array.from(args).map(a => 
+                typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)
+            ).join(' ');
+            logDiv.appendChild(el);
+        }
+        
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        
+        console.log = function(...args) { originalLog(...args); addLog('info', args); };
+        console.error = function(...args) { originalError(...args); addLog('error', args); };
+        console.warn = function(...args) { originalWarn(...args); addLog('warn', args); };
+        
+        window.onerror = function(msg, url, line, col, error) {
+            addLog('error', [`Uncaught Error: ${msg}\n${url}:${line}:${col}`, error]);
+            return false;
+        };
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+</body>
+</html>

@@ -18,95 +18,14 @@ export enum ShiftTime {
 
 export type UserRole = 'ADMIN' | 'PRESIDENTE' | 'TESORERIA' | 'LOGISTICA' | 'BARRA' | 'CAMARERO' | 'CAJERO' | 'FALLERO' | 'KIOSKO_VENTA' | 'KIOSKO_CASAL';
 
-export interface BarPriceRecipeItem {
-  stockItemId: string;
-  stockItemName: string;
-  quantity: number;
+export interface CustomPermission {
+  userId: string;
+  extraModules: string[];
 }
 
 export interface BarPrice {
   name: string;
   price: number;
-  recipe?: BarPriceRecipeItem[];
-}
-
-export interface ModuleDefinition {
-  id: string;
-  label: string;
-  section: string;
-}
-
-export const ALL_MODULES: ModuleDefinition[] = [
-  // Economía
-  { id: 'dashboard', label: 'Inicio / Panel', section: 'General' },
-  { id: 'help', label: 'Ayuda', section: 'General' },
-  { id: 'ai', label: 'Asistente Merello AI', section: 'General' },
-  { id: 'inventory', label: 'Presupuesto', section: 'Economía' },
-  { id: 'cash', label: 'Tesorería', section: 'Economía' },
-  { id: 'reports', label: 'Informes', section: 'Economía' },
-  { id: 'bar-profit', label: 'Cierre de Caja', section: 'Economía' },
-  // Logística
-  { id: 'purchase', label: 'Pedidos', section: 'Logística' },
-  { id: 'shopping', label: 'Lista Compra', section: 'Logística' },
-  { id: 'stock', label: 'Stock', section: 'Logística' },
-  { id: 'suppliers', label: 'Proveedores', section: 'Logística' },
-  // Operativa
-  { id: 'work-groups', label: 'Grupos Trabajo', section: 'Operativa' },
-  { id: 'logistics', label: 'Tareas', section: 'Operativa' },
-  { id: 'bar', label: 'Turnos Barra', section: 'Operativa' },
-  { id: 'meals', label: 'Cocina / Menús', section: 'Operativa' },
-  { id: 'hr', label: 'Censo Falleros', section: 'Operativa' },
-  // Utilidades
-  { id: 'tools', label: 'Calculadoras', section: 'Utilidades' },
-  { id: 'kiosk', label: 'Modo Kiosko', section: 'Utilidades' },
-  { id: 'settings-master', label: 'Ajustes Admin', section: 'Utilidades' },
-];
-
-export interface ModulePermissions {
-  canView: boolean;
-  canEdit: boolean;
-  canViewSensitive: boolean;
-}
-
-export const createPerm = (canView = true, canEdit = true, canViewSensitive = true): ModulePermissions => ({
-  canView, canEdit, canViewSensitive
-});
-
-export const generatePermsMap = (allowedIds: string[], readOnlyIds: string[] = [], noSensitiveIds: string[] = []): Record<string, ModulePermissions> => {
-  const map: Record<string, ModulePermissions> = {};
-  ALL_MODULES.forEach(m => {
-    // If list of allowed is exactly ALL_IDS, then `canView` is true for everything.
-    // Otherwise, check if it's in the allowed list.
-    const isAllowed = allowedIds.length === ALL_MODULES.length || allowedIds.includes(m.id);
-    map[m.id] = {
-      canView: isAllowed,
-      canEdit: isAllowed && !readOnlyIds.includes(m.id),
-      canViewSensitive: isAllowed && !noSensitiveIds.includes(m.id)
-    };
-  });
-  return map;
-}
-
-const ALL_IDS = ALL_MODULES.map(m => m.id);
-
-export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, ModulePermissions>> = {
-  ADMIN: generatePermsMap(ALL_IDS),
-  PRESIDENTE: generatePermsMap(ALL_IDS.filter(id => id !== 'kiosk')),
-  TESORERIA: generatePermsMap(['dashboard', 'help', 'inventory', 'cash', 'reports', 'bar-profit', 'ai']),
-  LOGISTICA: generatePermsMap(['dashboard', 'help', 'stock', 'purchase', 'shopping', 'suppliers', 'logistics', 'work-groups', 'kiosk', 'ai']),
-  BARRA: generatePermsMap(['dashboard', 'help', 'bar', 'stock', 'bar-profit', 'logistics']),
-  CAMARERO: generatePermsMap(['kiosk']),
-  CAJERO: generatePermsMap(['kiosk']),
-  FALLERO: generatePermsMap(['dashboard', 'help', 'bar', 'work-groups', 'logistics', 'meals']),
-  KIOSKO_VENTA: generatePermsMap(['kiosk']),
-  KIOSKO_CASAL: generatePermsMap(['kiosk']),
-};
-
-export interface BasicItem {
-  name: string;
-  quantity: number;
-  unit: string;
-  location: string;
 }
 
 export interface AppConfig {
@@ -114,21 +33,16 @@ export interface AppConfig {
   year: number;
   startDate: string;
   endDate: string;
-  projectionEndDate?: string;
   pins: Record<UserRole, string>;
   budgetCategories: string[];
   barPrices: BarPrice[];
   shiftLabels: Record<string, string>;
   supplierCategories: string[];
-  stockCategories: string[]; // List of active category IDs
-  stockCategoryDefs?: StockCategoryDef[]; // List of all category definitions (predefined + custom)
+  stockCategories: string[];
   units: string[];
   locations: string[];
   hapticPattern: number[];
   ntfyTopic?: string;
-  rolePermissions?: Record<UserRole, Record<string, ModulePermissions>>;
-  dashboardKpis?: string[];
-  basicItems?: BasicItem[];
 }
 
 export interface Member {
@@ -172,38 +86,12 @@ export interface Transaction {
   type: TransactionType;
   date: string;
   category: string;
-  subCategory?: string;
   isBarInvestment?: boolean;
-}
-
-export interface SubBudgetLine {
-  name: string;
-  estimated: number;
 }
 
 export interface BudgetLine {
   category: string;
   estimated: number;
-  subLines?: SubBudgetLine[];
-}
-
-export type AuditActionType =
-  | 'GASTO_AÑADIDO' | 'INGRESO_AÑADIDO'
-  | 'PARTIDA_CREADA' | 'PARTIDA_EDITADA' | 'PARTIDA_ELIMINADA'
-  | 'PRESUPUESTO_MODIFICADO'
-  | 'SUBPARTIDA_CREADA' | 'SUBPARTIDA_ELIMINADA'
-  | 'STOCK_ACTUALIZADO'
-  | 'PRODUCTO_AÑADIDO' | 'PRODUCTO_EDITADO' | 'PRODUCTO_ELIMINADO' | 'PEDIDO_MÍNIMO'
-  | 'CONFIG_CAMBIADA'
-  | 'LOGÍSTICA_ENVÍO' | 'LOGÍSTICA_ENTREGA';
-
-export interface AuditLogEntry {
-  id: string;
-  timestamp: string;
-  userRole: UserRole;
-  action: AuditActionType;
-  module: string;
-  detail: string;
 }
 
 export interface ShoppingItem {
@@ -227,8 +115,7 @@ export interface StockItem {
   quantity: number;
   minStock: number;
   unit: string;
-  category: string; // The ID of the primary category
-  subCategory?: string; // The ID of the subcategory
+  category: string;
   location: string;
   lastUpdated: string;
   costPerUnit: number;
@@ -267,155 +154,6 @@ export interface Supplier {
   contactPerson?: string;
   cif?: string;
 }
-
-export interface StockSubCategory {
-  id: string;
-  name: string;
-}
-
-export interface StockCategoryDef {
-  id: string;
-  name: string;
-  icon?: string;
-  subcategories: StockSubCategory[];
-}
-
-export const PREDEFINED_STOCK_CATEGORIES: StockCategoryDef[] = [
-  {
-    id: 'BEBIDAS',
-    name: 'Bebidas',
-    icon: 'Beer',
-    subcategories: [
-      { id: 'REFRESCOS', name: 'Refrescos' },
-      { id: 'CERVEZAS', name: 'Cervezas' },
-      { id: 'LICORES', name: 'Licores y Alcoholes' },
-      { id: 'AGUA', name: 'Agua' },
-      { id: 'ZUMOS', name: 'Zumos' },
-    ]
-  },
-  {
-    id: 'CAFETERIA',
-    name: 'Cafetería',
-    icon: 'Coffee',
-    subcategories: [
-      { id: 'CAFE', name: 'Café (Grano/Molido/Cápsulas)' },
-      { id: 'LECHE', name: 'Leche y Bebidas Vegetales' },
-      { id: 'AZUCAR', name: 'Azúcar y Edulcorantes' },
-      { id: 'INFUSIONES', name: 'Infusiones y Tés' },
-      { id: 'CACAO', name: 'Cacao en Polvo' },
-    ]
-  },
-  {
-    id: 'ALIMENTACION',
-    name: 'Alimentación y Snacks',
-    icon: 'Utensils',
-    subcategories: [
-      { id: 'SNACKS', name: 'Snacks Salados (Patatas, Cacaos, Olivas)' },
-      { id: 'PAN', name: 'Pan y Picatostes' },
-      { id: 'EMBUTIDO', name: 'Embutidos y Quesos' },
-      { id: 'SALSAS', name: 'Salsas y Condimentos' },
-      { id: 'CONSERVAS', name: 'Conservas' },
-    ]
-  },
-  {
-    id: 'CARNES_GUISOS',
-    name: 'Carnes y Guisos',
-    icon: 'Drumstick',
-    subcategories: [
-      { id: 'CARNE_TORRA', name: 'Carne para Torraes' },
-      { id: 'INGREDIENTES_PAELLA', name: 'Ingredientes Paella' },
-      { id: 'VERDURAS', name: 'Verduras Frescas' },
-      { id: 'ACEITE_SAL', name: 'Aceite, Sal y Especias' },
-    ]
-  },
-  {
-    id: 'DULCES',
-    name: 'Dulces y Meriendas',
-    icon: 'Cake',
-    subcategories: [
-      { id: 'BOLLERIA', name: 'Bollería y Fartons' },
-      { id: 'CHOCOLATE', name: 'Chocolate a la Taza' },
-      { id: 'HORCHATA', name: 'Horchata' },
-      { id: 'GOMINOLAS', name: 'Gominolas / Infantil' },
-    ]
-  },
-  {
-    id: 'LIMPIEZA',
-    name: 'Limpieza e Higiene',
-    icon: 'Sparkles',
-    subcategories: [
-      { id: 'PRODUCTOS_QUIMICOS', name: 'Lejía, Friegasuelos, Multiusos' },
-      { id: 'BOLSAS_BASURA', name: 'Bolsas de Basura' },
-      { id: 'UTILES_LIMPIEZA', name: 'Estropajos, Bayetas, Fregonas' },
-      { id: 'PAPEL_HIGIENICO', name: 'Papel Higiénico y Toallas Mano' },
-      { id: 'JABON', name: 'Jabón de Manos / Lavavajillas' },
-    ]
-  },
-  {
-    id: 'MENAJE',
-    name: 'Menaje y Desechables',
-    icon: 'CupSoda',
-    subcategories: [
-      { id: 'VASOS_PLASTICO', name: 'Vasos Plástico / Cartón' },
-      { id: 'PLATOS_CUBIERTOS', name: 'Platos y Cubiertos' },
-      { id: 'SERVILLETAS', name: 'Servilletas y Manteles' },
-      { id: 'RECIPIENTES', name: 'Tupper y Bandejas Alumino' },
-    ]
-  },
-  {
-    id: 'PAPELERIA_EVENTOS',
-    name: 'Papelería y Eventos',
-    icon: 'Ticket',
-    subcategories: [
-      { id: 'TICKETS', name: 'Tickets Dúplex y Matrices' },
-      { id: 'PULSERAS', name: 'Pulseras Acceso' },
-      { id: 'OFICINA', name: 'Bolígrafos, Folios, Rotuladores' },
-      { id: 'CINTAS', name: 'Cinta Aislante / Americana' },
-    ]
-  },
-  {
-    id: 'PIROTECNIA',
-    name: 'Pirotecnia',
-    icon: 'Flame',
-    subcategories: [
-      { id: 'TRACAS', name: 'Tracas' },
-      { id: 'PETARDOS', name: 'Cajas de Petardos' },
-      { id: 'MECHAS', name: 'Mechas' },
-    ]
-  },
-  {
-    id: 'DECORACION',
-    name: 'Decoración e Infraestructura',
-    icon: 'Palette',
-    subcategories: [
-      { id: 'BANDERINES', name: 'Banderines y Guirnaldas' },
-      { id: 'GLOBOS', name: 'Globos' },
-      { id: 'TELAS', name: 'Telas y Corcho' },
-      { id: 'ILUMINACION', name: 'Bombillas, Regletas, Alargadores' },
-    ]
-  },
-  {
-    id: 'BOTIQUIN',
-    name: 'Botiquín',
-    icon: 'Cross',
-    subcategories: [
-      { id: 'CURAS', name: 'Tiritas, Vendas, Agua Oxigenada' },
-      { id: 'ANALGESICOS', name: 'Analgésicos Básicos' },
-      { id: 'QUEMADURAS', name: 'Cremas Quemaduras' },
-    ]
-  },
-  {
-    id: 'OTROS',
-    name: 'Otros',
-    icon: 'Box',
-    subcategories: [
-      { id: 'HIELO', name: 'Hielo' },
-      { id: 'COMBUSTIBLE', name: 'Butano, Leña, Carbón' },
-      { id: 'INDUMENTARIA', name: 'Merchandising, Polares, Pañuelos' },
-      { id: 'VARIO', name: 'Varios' },
-    ]
-  }
-];
 
 export interface Order {
   id: string;
@@ -540,7 +278,6 @@ export interface AppData {
   barSessions: BarSession[];
   catalog: CatalogItem[];
   workGroups: WorkGroup[];
-  auditLog: AuditLogEntry[];
   kioskStatus: {
     VENTA: KioskWorkload;
     CASAL: KioskWorkload;
@@ -594,8 +331,7 @@ export const DEFAULT_DATA: AppData = {
       [ShiftTime.NIGHT]: 'Noche'
     },
     supplierCategories: ['Bebida', 'Comida', 'Servicios'],
-    stockCategories: ['BEBIDAS', 'CAFETERIA', 'ALIMENTACION', 'LIMPIEZA', 'MENAJE', 'PAPELERIA_EVENTOS', 'PIROTECNIA'],
-    stockCategoryDefs: PREDEFINED_STOCK_CATEGORIES,
+    stockCategories: ['BEBIDA', 'COMIDA', 'SUMINISTROS'],
     units: ['u', 'kg', 'L', 'cajas'],
     locations: ['Barra', 'Cocina', 'Almacén'],
     hapticPattern: [200, 100, 200],
@@ -621,7 +357,6 @@ export const DEFAULT_DATA: AppData = {
   barSessions: [],
   catalog: [],
   workGroups: [],
-  auditLog: [],
   kioskStatus: {
     VENTA: 'NORMAL',
     CASAL: 'NORMAL'
@@ -630,3 +365,22 @@ export const DEFAULT_DATA: AppData = {
 
 // Escudo Falla Eduardo Merello
 export const ESCUDO_BASE64 = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MDAgNjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjAiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjZmZkNzAwIi8+PHN0b3Agb2ZZnNldD0iMTAwJSIgc3R5bGU9InN0b3AtY29sb3I6I2Y1OWUwYiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjx0ZXh0IHg9IjQwIiB5PSI1MjAiIGZvbnQtc2l6ZT0iMjAwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtd2VpZ2h0PSI5MDAiIGZpbGw9IiM5M2M1ZmQiIHN0cm9rZT0iIzFlNDBhZiIgc3Ryb2tlLXdpZHRoPSI0Ij5NPC90ZXh0Pjx0ZXh0IHg9IjM0MCIgeT0iNTIwIiBmb250LXNpemU9IjIwMCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXN0eWxlPSJub3JtYWwiIGZvbnQtd2VpZ2h0PSI5MDAiIGZpbGw9IiM5M2M1ZmQiIHN0cm9rZT0iIzFlNDBhZiIgc3Ryb2tlLXdpZHRoPSI0Ij5QPC90ZXh0Pjwvc3ZnPg==";
+
+export interface PlanItem {
+  id: string;
+  catalogId: string;
+  name: string;
+  category: string;
+  quantity: number;
+  unitPrice: number;
+  unit: string;
+}
+
+export interface Plan {
+  id: string;
+  name: string;
+  type: 'CASAL' | 'BAR';
+  items: PlanItem[];
+  status: 'DRAFT' | 'READY';
+  updatedAt: string;
+}

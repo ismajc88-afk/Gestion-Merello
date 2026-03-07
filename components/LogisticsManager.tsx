@@ -1,13 +1,10 @@
 
 import React, { useState } from 'react';
-import { Task, Member, TaskStatus, SubTask } from '../types';
+import { Task, Member, TaskStatus } from '../types';
 import {
-   Briefcase, Sparkles, Plus, Search, LayoutGrid, List as ListIcon,
-   Calendar, Trash2, ArrowRight, ArrowLeft, CheckCircle2,
-   AlertOctagon, Clock, Trophy,
-   X, CheckSquare, Square,
-   Flag, AlertTriangle, PlayCircle, MoreHorizontal,
-   AlignLeft, Tag, ListChecks, Check, Map, Target
+   Briefcase, Plus,
+   Clock,
+   X, CheckSquare, Square
 } from 'lucide-react';
 
 interface Props {
@@ -19,10 +16,10 @@ interface Props {
    onAiSuggest: () => void;
 }
 
-export const LogisticsManager: React.FC<Props> = ({ tasks, members, onAddTask, onUpdateTask, onDeleteTask, onAiSuggest }) => {
-   const [viewMode, setViewMode] = useState<'BOARD' | 'LIST'>('BOARD');
-   const [searchQuery, setSearchQuery] = useState('');
-   const [priorityFilter, setPriorityFilter] = useState<'ALL' | 'HIGH' | 'MEDIUM' | 'LOW'>('ALL');
+export const LogisticsManager: React.FC<Props> = ({ tasks, members, onAddTask, onUpdateTask, onDeleteTask }) => {
+   // Filters
+   const searchQuery = '';
+   const priorityFilter = 'ALL';
    const [isModalOpen, setIsModalOpen] = useState(false);
    const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
@@ -35,8 +32,8 @@ export const LogisticsManager: React.FC<Props> = ({ tasks, members, onAddTask, o
    const selectedTask = tasks.find(t => t.id === selectedTaskId);
 
    const filteredTasks = tasks.filter(t => {
-      const matchesSearch = t.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-         t.assignee?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+         t.assignee.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesPriority = priorityFilter === 'ALL' || t.priority === priorityFilter;
       return matchesSearch && matchesPriority;
    });
@@ -54,11 +51,7 @@ export const LogisticsManager: React.FC<Props> = ({ tasks, members, onAddTask, o
       hapticClick();
    };
 
-   const handleAssign = (taskId: string, memberId: string) => {
-      const memberName = members.find(m => m.id === memberId)?.name || '';
-      onUpdateTask(taskId, { assigneeId: memberId, assignee: memberName });
-      hapticClick();
-   };
+   // handleAssign removed
 
    const toggleSubtask = (taskId: string, subtaskId: string) => {
       const task = tasks.find(t => t.id === taskId);

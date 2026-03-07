@@ -1,16 +1,16 @@
 
 import React, { useState } from 'react';
 import { 
-  LayoutDashboard, Wallet, ShoppingCart, Users, Beer, 
-  Calculator, FileText, Truck, ClipboardList, Utensils, 
-  PieChart, CreditCard, ShoppingBag, RefreshCw, 
-  Zap, ChevronDown, ShieldCheck, Database, Terminal,
-  Activity, Target, Info, Search, Eye, HelpCircle, 
-  AlertTriangle, CheckCircle2, TrendingUp, Cpu, Wifi,
-  Merge, ShieldAlert, BookOpen, Star, Flame, Trophy,
-  Scale, Thermometer, Box, ZapOff, Clock, Smartphone,
-  Package, Map, Fingerprint, Receipt, ListChecks,
-  History, Settings, Menu, Bell
+  LayoutDashboard, Wallet, Users, 
+  Calculator, FileText, Truck, ClipboardList, 
+  RefreshCw, 
+  Zap, ShieldCheck, Database, 
+  
+  Cpu, Wifi,
+  Merge, BookOpen, 
+  
+  Fingerprint, 
+  Bell
 } from 'lucide-react';
 
 export const HelpGuide: React.FC = () => {

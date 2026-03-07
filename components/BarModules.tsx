@@ -1,5 +1,5 @@
 import React from 'react';
-import { Shift, ShiftTime, Member } from '../types';
+import { Shift, Member } from '../types';
 import { Users, Clock, Printer } from 'lucide-react';
 
 interface BarProps {
@@ -8,7 +8,7 @@ interface BarProps {
   onAutoAssign: () => void;
 }
 
-export const BarModules: React.FC<BarProps> = ({ shifts, members, onAutoAssign }) => {
+export const BarModules: React.FC<BarProps> = ({ shifts, onAutoAssign }) => {
   const dates = Array.from(new Set(shifts.map(s => s.date))).sort() as string[];
 
   return (

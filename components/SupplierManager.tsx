@@ -4,8 +4,8 @@ import { Supplier, Order, ESCUDO_BASE64 } from '../types';
 import {
     Phone, Package, Search, BarChart3, Building2,
     User, Contact, X, CheckCircle2, Plus, Trash2, Home, Store, DollarSign,
-    AlertCircle, Edit, MessageCircle, TrendingUp, PieChart as PieIcon, ArrowRight,
-    FileText, Truck, Minus, Printer
+    AlertCircle, Edit, MessageCircle, TrendingUp, PieChart as PieIcon,
+    FileText, Truck, Printer
 } from 'lucide-react';
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend
@@ -247,7 +247,7 @@ export const SupplierManager: React.FC<Props> = ({ suppliers, orders, categories
                 {/* --- DIRECTORY TAB --- */}
                 {activeTab === 'DIRECTORY' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {suppliers.filter(s => s.name?.toLowerCase().includes(searchQuery.toLowerCase())).map(sup => {
+                        {suppliers.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase())).map(sup => {
                             const pendingCount = stats.pendingBySupplier.find(p => p.id === sup.id)?.count || 0;
 
                             return (
@@ -426,7 +426,7 @@ export const SupplierManager: React.FC<Props> = ({ suppliers, orders, categories
                                             <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 10, fontWeight: 'bold' }} axisLine={false} tickLine={false} />
                                             <Tooltip cursor={{ fill: '#f1f5f9' }} contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
                                             <Bar dataKey="value" barSize={16} radius={[0, 8, 8, 0]}>
-                                                {stats.volumeBySupplier.map((entry, index) => (
+                                                {stats.volumeBySupplier.map((_, index) => (
                                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                                 ))}
                                             </Bar>
@@ -443,7 +443,7 @@ export const SupplierManager: React.FC<Props> = ({ suppliers, orders, categories
                                     <ResponsiveContainer width="100%" height="100%">
                                         <PieChart>
                                             <Pie data={stats.volumeBySupplier} dataKey="count" nameKey="name" innerRadius={60} outerRadius={80} paddingAngle={5}>
-                                                {stats.volumeBySupplier.map((entry, index) => (
+                                                {stats.volumeBySupplier.map((_, index) => (
                                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                                 ))}
                                             </Pie>

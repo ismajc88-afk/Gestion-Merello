@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     StockItem, Incident, KioskConfig, BarPrice,
     AppConfig, KioskWorkload, UserRole, Shift
@@ -10,9 +10,10 @@ import {
     AlertTriangle, Snowflake, Wine,
     Package, Check,
     X, Plus, Minus, Ticket,
-    RotateCcw, Zap,
+    RotateCcw, Zap, ZapOff,
     Lock, ShieldAlert, History
 } from 'lucide-react';
+import { useScreenWakeLock } from '../hooks/useScreenWakeLock';
 
 interface KioskModeProps {
     stock: StockItem[];
@@ -32,6 +33,7 @@ interface KioskModeProps {
     initialMode: 'VENTA' | 'CASAL';
     mode?: 'POS' | 'STOCK_ONLY' | 'LOGISTICS';
     userRole: UserRole;
+    onMarkAsDelivered?: (incidentId: string) => void;
     onConfirmReceipt?: (incidentId: string) => void;
 }
 
@@ -48,23 +50,14 @@ export const KioskMode: React.FC<KioskModeProps> = ({
     initialMode,
     mode = 'POS',
     userRole,
+    onMarkAsDelivered,
     onConfirmReceipt
 }) => {
     // --- STATE ---
     const [workload, setWorkload] = useState<KioskWorkload>('NORMAL');
     const [showRequests, setShowRequests] = useState(false);
     const toast = useToast();
-
-    // --- DEDUP: Evitar peticiones duplicadas (30 segundos) ---
-    const lastRequestRef = useRef<{ itemId: string; timestamp: number } | null>(null);
-    const isDuplicate = (itemId: string) => {
-        const now = Date.now();
-        if (lastRequestRef.current && lastRequestRef.current.itemId === itemId && (now - lastRequestRef.current.timestamp) < 30000) {
-            return true;
-        }
-        lastRequestRef.current = { itemId, timestamp: now };
-        return false;
-    };
+    const { isLocked, toggleLock } = useScreenWakeLock();
 
     // POS State (Solo para Cajeros)
     const [cart, setCart] = useState<{ name: string, price: number, quantity: number }[]>([]);
@@ -72,21 +65,12 @@ export const KioskMode: React.FC<KioskModeProps> = ({
     const [showCounter, setShowCounter] = useState(false);
     const [manualCountMode, setManualCountMode] = useState(false);
     const [correctionMode, setCorrectionMode] = useState(false);
-    const [showChangeCalc, setShowChangeCalc] = useState(false);
-    const [paidAmount, setPaidAmount] = useState('');
-    const [lastSaleTotal, setLastSaleTotal] = useState(0);
-    const salesGoal = 500; // Objetivo de ventas €
 
     // Stock State (Para Camareros/Casal)
     const [restockItem, setRestockItem] = useState<StockItem | null>(null);
     const [restockQty, setRestockQty] = useState(1);
     const [restockUrgency, setRestockUrgency] = useState<'NORMAL' | 'URGENT'>('NORMAL');
     const [justification, setJustification] = useState(''); // Para peticiones que excedan cupo
-    const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-
-    // Change Request State (Para Cajeros)
-    const [showChangeRequestModal, setShowChangeRequestModal] = useState(false);
-    const [changeRequestAmount, setChangeRequestAmount] = useState<number | string>('');
 
     // --- EFECTOS ---
     useEffect(() => {
@@ -101,19 +85,6 @@ export const KioskMode: React.FC<KioskModeProps> = ({
         return incidents
             .filter(inc => inc.stockItemId === itemId && inc.timestamp.startsWith(today) && inc.status === 'RESOLVED')
             .reduce((acc, inc) => acc + (inc.quantity || 1), 0);
-    };
-
-    const getCatEmoji = (categoryName?: string) => {
-        const cat = categoryName?.toUpperCase() || '';
-        if (cat.includes('BEBIDA')) return '🍺';
-        if (cat.includes('LICOR')) return '🥃';
-        if (cat.includes('REFRESCO')) return '🥤';
-        if (cat.includes('VINO')) return '🍷';
-        if (cat.includes('SUMINISTRO')) return '🧻';
-        if (cat.includes('COMIDA')) return '🍖';
-        if (cat.includes('HIELO')) return '🧊';
-        if (cat.includes('VASO')) return '🥤';
-        return '📦';
     };
 
     const cartTotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
@@ -146,69 +117,19 @@ export const KioskMode: React.FC<KioskModeProps> = ({
 
     const handleCheckout = () => {
         if (cart.length === 0) return;
-        setLastSaleTotal(cartTotal);
         onTicketSale?.(cart);
         setCart([]);
         setMobileTab('PRODUCTS');
-        setShowChangeCalc(true);
-        setPaidAmount('');
     };
 
-    // --- COMBOS/DESCUENTOS ---
-    const combos = [
-        { items: ['RON', 'COCA-COLA'], comboPrice: 3.5, label: 'Cubata Combo' },
-        { items: ['GINEBRA', 'TÓNICA'], comboPrice: 4.0, label: 'GinTonic Combo' },
-        { items: ['VODKA', 'NARANJA'], comboPrice: 3.5, label: 'Vodka Naranja Combo' },
-    ];
-    const appliedCombos = combos.filter(combo => {
-        return combo.items.every(itemName =>
-            cart.some(c => c.name.toUpperCase().includes(itemName))
-        );
-    });
-    const comboDiscount = appliedCombos.reduce((acc, combo) => {
-        const normalPrice = combo.items.reduce((sum, itemName) => {
-            const cartItem = cart.find(c => c.name.toUpperCase().includes(itemName));
-            return sum + (cartItem?.price || 0);
-        }, 0);
-        return acc + (normalPrice - combo.comboPrice);
-    }, 0);
-    const finalTotal = cartTotal - comboDiscount;
-
-    // --- TOP 3 PRODUCTOS ---
-    const top3 = Object.entries(ticketCounts)
-        .sort((a, b) => (b[1] as number) - (a[1] as number))
-        .slice(0, 3);
-    const totalSalesEuros = Object.entries(ticketCounts).reduce((acc, [name, count]) => {
-        const price = prices.find(p => p.name.toUpperCase() === name.toUpperCase())?.price || 0;
-        return acc + (price * (count as number));
-    }, 0);
-
+    // --- HANDLERS STOCK ---
     const handleIceRequest = () => {
-        if (isDuplicate('ICE_REQUEST')) {
-            toast.warning('Ya has pedido hielo hace menos de 30 segundos');
-            return;
-        }
         onCreateIncident('Necesitamos Hielo Urgente', 'URGENT', undefined, 1, initialMode);
         alert("❄️ AVISO DE HIELO ENVIADO");
     };
 
-    const handleChangeRequest = (amount: number | string) => {
-        if (isDuplicate('CHANGE_REQUEST')) {
-            toast.warning('Ya has pedido cambio hace menos de 30 segundos');
-            return;
-        }
-        onCreateIncident(`🚨 NECESITAMOS CAMBIO: ${amount}€`, 'URGENT', undefined, 1, initialMode);
-        setShowChangeRequestModal(false);
-        setChangeRequestAmount('');
-        toast.success(`Aviso de cambio de ${amount}€ enviado a Coordinación`);
-    };
-
     const confirmRestock = () => {
         if (!restockItem) return;
-        if (isDuplicate(restockItem.id)) {
-            toast.warning(`Ya pediste ${restockItem.name} hace menos de 30 segundos`);
-            return;
-        }
         onCreateIncident(`Reposición: ${restockItem.name}`, restockUrgency, restockItem.id, restockQty, initialMode);
         setRestockItem(null);
         setJustification('');
@@ -241,14 +162,15 @@ export const KioskMode: React.FC<KioskModeProps> = ({
         return (
             <div className="fixed inset-0 bg-[#0f172a] text-white z-[500] flex flex-col h-[100dvh]">
                 {/* HEADER POS */}
-                <div className="px-3 py-2 bg-slate-900 border-b border-white/10 flex justify-between items-center shrink-0 safe-pt">
-                    <div className="flex items-center gap-2">
-                        <button onClick={onExit} className="p-2.5 bg-white/10 rounded-xl hover:bg-rose-500/20"><LogOut size={18} /></button>
-                        <h2 className="font-black text-base md:text-lg uppercase italic tracking-tighter">CAJA / TPV</h2>
+                <div className="p-3 bg-slate-900 border-b border-white/10 flex justify-between items-center shrink-0 safe-pt">
+                    <div className="flex items-center gap-3">
+                        <button onClick={onExit} className="p-3 bg-white/10 rounded-2xl hover:bg-rose-500/20"><LogOut size={20} /></button>
+                        <h2 className="font-black text-lg uppercase italic tracking-tighter">CAJA / TPV</h2>
                     </div>
-                    <div className="flex gap-1.5">
-                        <button onClick={() => { setCorrectionMode(!correctionMode); setManualCountMode(false); }} className={`p-2.5 rounded-xl ${correctionMode ? 'bg-rose-500 animate-pulse' : 'bg-white/10'}`}><RotateCcw size={18} /></button>
-                        <button onClick={() => setShowCounter(true)} className="p-2.5 bg-indigo-600/20 text-indigo-400 rounded-xl"><Ticket size={18} /></button>
+                    <div className="flex gap-2">
+                        <button onClick={toggleLock} className={`p-3 rounded-xl transition-all ${isLocked ? 'bg-amber-500 text-slate-900 shadow-[0_0_15px_rgba(245,158,11,0.4)]' : 'bg-white/10 text-slate-400'}`}>{isLocked ? <Zap size={20} fill="currentColor" /> : <ZapOff size={20} />}</button>
+                        <button onClick={() => { setCorrectionMode(!correctionMode); setManualCountMode(false); }} className={`p-3 rounded-xl ${correctionMode ? 'bg-rose-500 animate-pulse' : 'bg-white/10'}`}><RotateCcw size={20} /></button>
+                        <button onClick={() => setShowCounter(true)} className="p-3 bg-indigo-600/20 text-indigo-400 rounded-xl"><Ticket size={20} /></button>
                     </div>
                 </div>
 
@@ -256,59 +178,26 @@ export const KioskMode: React.FC<KioskModeProps> = ({
                 <div className="flex-1 flex overflow-hidden relative">
                     {/* GRID PRODUCTOS */}
                     <div className={`flex-1 flex flex-col bg-[#0f172a] ${mobileTab === 'CART' ? 'hidden md:flex' : 'flex'}`}>
-                        {/* CONTADOR VENTAS + OBJETIVO */}
-                        <div className="bg-emerald-600/20 border-b border-emerald-500/30 px-3 py-1.5 shrink-0">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-1.5">
-                                    <Ticket size={12} className="text-emerald-400" />
-                                    <span className="text-[9px] font-black text-emerald-300 uppercase tracking-wider">Ventas</span>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <span className="text-xs font-black text-white tabular-nums">
-                                        {Object.values(ticketCounts).reduce((a, c) => a + (c as number), 0)} uds
-                                    </span>
-                                    <span className="text-xs font-black text-emerald-400 tabular-nums">{totalSalesEuros.toLocaleString('es-ES')}€</span>
-                                </div>
-                            </div>
-                            {/* OBJETIVO DE VENTAS */}
-                            <div className="flex items-center gap-2 mt-1">
-                                <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
-                                    <div className={`h-full rounded-full transition-all duration-700 ${totalSalesEuros >= salesGoal ? 'bg-emerald-400' : totalSalesEuros >= salesGoal * 0.7 ? 'bg-amber-400' : 'bg-indigo-400'}`} style={{ width: `${Math.min((totalSalesEuros / salesGoal) * 100, 100)}%` }}></div>
-                                </div>
-                                <span className="text-[8px] font-black text-slate-400 tabular-nums whitespace-nowrap">{Math.round((totalSalesEuros / salesGoal) * 100)}% de {salesGoal}€</span>
-                            </div>
-                        </div>
-                        {/* TOP 3 PRODUCTOS */}
-                        {top3.length > 0 && (
-                            <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-800/50 border-b border-white/5 shrink-0 overflow-x-auto">
-                                <span className="text-[8px] font-black text-amber-400 uppercase shrink-0">Top:</span>
-                                {top3.map(([name, count], i) => (
-                                    <span key={name} className="text-[9px] font-black text-slate-300 whitespace-nowrap">
-                                        {i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'} {name} <span className="text-emerald-400">{count}</span>
-                                    </span>
-                                ))}
-                            </div>
-                        )}
                         {manualCountMode && <div className="bg-orange-500 text-black text-center text-xs font-black py-1">MODO CONTEO (NO COBRA)</div>}
                         {correctionMode && <div className="bg-rose-600 text-white text-center text-xs font-black py-1">MODO CORRECCIÓN (RESTAR)</div>}
 
-                        <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-4 gap-2 p-2 md:p-4 pb-24 overflow-y-auto">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 p-4 pb-32 overflow-y-auto">
                             {allItems.map(itemName => {
                                 const price = prices.find(p => p.name.toUpperCase() === itemName.toUpperCase())?.price || 0;
                                 const qtyInCart = cart.find(i => i.name === itemName)?.quantity || 0;
                                 return (
-                                    <button key={itemName} onClick={() => handleProductClick(itemName, price)} className={`relative p-2 md:p-4 rounded-2xl md:rounded-3xl flex flex-col items-center justify-between text-center h-28 md:h-44 border-2 active:scale-95 transition-transform ${correctionMode ? 'bg-rose-50 border-rose-500' : 'bg-white border-slate-100'}`}>
-                                        {qtyInCart > 0 && <div className="absolute top-1.5 right-1.5 md:top-3 md:right-3 bg-indigo-600 text-white w-6 h-6 md:w-8 md:h-8 rounded-lg md:rounded-xl flex items-center justify-center font-black text-xs md:text-sm">{qtyInCart}</div>}
-                                        <span className="text-[11px] md:text-base font-black uppercase text-slate-900 mt-2 leading-tight line-clamp-2">{itemName}</span>
-                                        <span className="text-lg md:text-2xl font-black text-emerald-500 mb-1">{price}€</span>
+                                    <button key={itemName} onClick={() => handleProductClick(itemName, price)} className={`relative p-4 rounded-[32px] flex flex-col items-center justify-between text-center h-48 border-2 ${correctionMode ? 'bg-rose-50 border-rose-500' : 'bg-white border-slate-100'}`}>
+                                        {qtyInCart > 0 && <div className="absolute top-3 right-3 bg-indigo-600 text-white w-8 h-8 rounded-xl flex items-center justify-center font-black">{qtyInCart}</div>}
+                                        <span className="text-base font-black uppercase text-slate-900 mt-4 leading-tight">{itemName}</span>
+                                        <span className="text-2xl font-black text-emerald-500 mb-2">{price}€</span>
                                     </button>
                                 );
                             })}
                         </div>
                         {/* FAB CART MOBILE */}
-                        <div className="md:hidden absolute bottom-2 left-2 right-2">
-                            <button onClick={() => setMobileTab('CART')} className="w-full py-3 bg-emerald-600 text-white rounded-xl font-black uppercase text-sm shadow-xl flex items-center justify-center gap-2">
-                                <ShoppingCart size={18} /> Ticket ({cartCount}) · {finalTotal.toFixed(2)}€
+                        <div className="md:hidden absolute bottom-4 left-4 right-4">
+                            <button onClick={() => setMobileTab('CART')} className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase shadow-xl flex items-center justify-center gap-2">
+                                <ShoppingCart size={20} /> Ver Ticket ({cartCount})
                             </button>
                         </div>
                     </div>
@@ -331,39 +220,12 @@ export const KioskMode: React.FC<KioskModeProps> = ({
                                 </div>
                             ))}
                         </div>
-                        <div className="p-4 md:p-6 bg-slate-800 border-t border-white/10 safe-pb">
-                            {appliedCombos.length > 0 && (
-                                <div className="mb-2 space-y-1">
-                                    {appliedCombos.map((combo, i) => (
-                                        <div key={i} className="flex justify-between items-center bg-amber-500/20 text-amber-300 px-2.5 py-1 rounded-lg text-[11px] font-bold">
-                                            <span>🎯 {combo.label}</span>
-                                            <span>-{(cartTotal - finalTotal).toFixed(2)}€</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                            <div className="flex justify-between items-end mb-3">
-                                <span className="text-slate-400 font-bold text-[10px] uppercase">Total</span>
-                                <div className="text-right">
-                                    {comboDiscount > 0 && <span className="text-xs text-slate-500 line-through mr-2">{cartTotal.toFixed(2)}€</span>}
-                                    <span className="text-3xl md:text-4xl font-black">{finalTotal.toFixed(2)}€</span>
-                                </div>
+                        <div className="p-6 bg-slate-800 border-t border-white/10 safe-pb">
+                            <div className="flex justify-between items-end mb-4">
+                                <span className="text-slate-400 font-bold text-xs uppercase">Total</span>
+                                <span className="text-4xl font-black">{cartTotal.toFixed(2)}€</span>
                             </div>
-                            <div className="flex gap-2 mb-4">
-                                <button
-                                    onClick={() => setShowChangeRequestModal(true)}
-                                    className="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-slate-900 rounded-xl font-black uppercase text-xs md:text-sm flex items-center justify-center gap-2 transition-colors border-b-4 border-amber-700 active:translate-y-1 active:border-b-0"
-                                >
-                                    <AlertTriangle size={18} /> Pedir Cambio
-                                </button>
-                                <button
-                                    onClick={() => setCart([])}
-                                    className="flex-1 py-3 bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 rounded-xl font-bold uppercase text-xs md:text-sm flex items-center justify-center gap-2 transition-colors"
-                                >
-                                    <X size={18} /> Cancelar
-                                </button>
-                            </div>
-                            <button onClick={handleCheckout} disabled={cart.length === 0} className="w-full py-4 bg-emerald-500 text-slate-900 rounded-xl font-black uppercase text-base md:text-lg">Cobrar</button>
+                            <button onClick={handleCheckout} disabled={cart.length === 0} className="w-full py-5 bg-emerald-500 text-slate-900 rounded-2xl font-black uppercase text-lg">Cobrar</button>
                         </div>
                     </div>
                 </div>
@@ -393,161 +255,157 @@ export const KioskMode: React.FC<KioskModeProps> = ({
                         </div>
                     </div>
                 )}
-
-                {/* MODAL CALCULADORA DE CAMBIO */}
-                {showChangeCalc && (
-                    <div className="fixed inset-0 z-[600] bg-black/90 flex items-center justify-center p-4">
-                        <div className="bg-slate-900 w-full max-w-sm rounded-[32px] p-6 border border-emerald-500/50">
-                            <div className="flex justify-between mb-4">
-                                <h3 className="text-xl font-black text-white">💰 Cambio</h3>
-                                <button onClick={() => setShowChangeCalc(false)}><X /></button>
-                            </div>
-                            <div className="bg-slate-800 rounded-2xl p-4 mb-4 text-center">
-                                <p className="text-[10px] text-slate-400 uppercase font-bold">Total cobrado</p>
-                                <p className="text-3xl font-black text-emerald-400">{lastSaleTotal.toFixed(2)}€</p>
-                            </div>
-                            <div className="mb-4">
-                                <p className="text-[10px] text-slate-400 uppercase font-bold mb-2">El cliente paga con:</p>
-                                <input
-                                    type="number"
-                                    value={paidAmount}
-                                    onChange={e => setPaidAmount(e.target.value)}
-                                    placeholder="0.00"
-                                    className="w-full p-4 bg-slate-800 border-2 border-slate-700 rounded-2xl text-center text-3xl font-black text-white outline-none focus:border-emerald-500"
-                                    autoFocus
-                                />
-                            </div>
-                            {paidAmount && Number(paidAmount) >= lastSaleTotal && (
-                                <div className="bg-emerald-500/20 border border-emerald-500/50 rounded-2xl p-4 text-center">
-                                    <p className="text-[10px] text-emerald-300 uppercase font-bold">Devolver</p>
-                                    <p className="text-4xl font-black text-emerald-400">{(Number(paidAmount) - lastSaleTotal).toFixed(2)}€</p>
-                                </div>
-                            )}
-                            {paidAmount && Number(paidAmount) < lastSaleTotal && (
-                                <div className="bg-rose-500/20 border border-rose-500/50 rounded-2xl p-4 text-center">
-                                    <p className="text-[10px] text-rose-300 uppercase font-bold">Falta</p>
-                                    <p className="text-4xl font-black text-rose-400">{(lastSaleTotal - Number(paidAmount)).toFixed(2)}€</p>
-                                </div>
-                            )}
-                            <div className="grid grid-cols-4 gap-2 mt-4">
-                                {[5, 10, 20, 50].map(v => (
-                                    <button key={v} onClick={() => setPaidAmount(String(v))} className="py-3 bg-slate-800 hover:bg-slate-700 rounded-xl font-black text-white">{v}€</button>
-                                ))}
-                            </div>
-                            <button onClick={() => setShowChangeCalc(false)} className="w-full mt-4 py-4 bg-emerald-500 text-slate-900 rounded-2xl font-black uppercase">Cerrar</button>
-                        </div>
-                    </div>
-                )}
             </div>
         );
     }
 
     // ----------------------------------------------------------------------
-    // RENDER: LOGISTICS MODE - KANBAN SIMPLIFICADO (2 COLUMNAS)
+    // RENDER: LOGISTICS MODE - GESTIÓN DE PETICIONES
     // ----------------------------------------------------------------------
     if (mode === 'LOGISTICS') {
-        // Pendientes = todo lo que NO está RESOLVED (incluye DELIVERED antiguos)
-        const pendingRequests = incidents.filter(inc => (inc.status === 'OPEN' || inc.status === 'PENDING_DELIVERY' || inc.status === 'PENDING_APPROVAL' || inc.status === 'DELIVERED') && inc.stockItemId);
-        const completedToday = incidents.filter(inc => inc.status === 'RESOLVED' && inc.stockItemId && inc.timestamp.startsWith(new Date().toISOString().split('T')[0]));
+        const pendingRequests = incidents.filter(inc =>
+            inc.status === 'OPEN' && inc.stockItemId
+        );
 
-        const handleResolve = (incidentId: string) => {
-            if (confirm('¿Enviado/entregado este pedido?')) {
-                onConfirmReceipt?.(incidentId);
-                toast.success('✅ Pedido completado');
+        const handleMarkAsDelivered = (incidentId: string) => {
+            if (confirm('¿Confirmar que has entregado este pedido?')) {
+                onMarkAsDelivered?.(incidentId);
+                toast.success('Pedido marcado como entregado');
             }
         };
 
-        const renderCard = (request: typeof incidents[0], done: boolean) => {
-            const stockItem = stock.find(s => s.id === request.stockItemId);
-            if (!stockItem) return null;
-            const isUrgent = request.priority === 'URGENT';
-
-            return (
-                <div key={request.id} className={`rounded-2xl p-4 border-2 shadow-sm transition-all ${isUrgent && !done ? 'bg-red-500/10 border-red-500/30 animate-pulse' : done ? 'bg-emerald-500/5 border-emerald-500/20 opacity-70' : 'bg-slate-800/50 border-slate-700'}`}>
-                    <div className="flex justify-between items-start mb-2">
-                        <div className="flex flex-wrap gap-1.5">
-                            {isUrgent && <span className="px-2 py-0.5 bg-red-500 text-white text-[9px] font-black uppercase rounded-full">🚨 Urgente</span>}
-                            <span className="px-2 py-0.5 bg-slate-950 text-slate-300 text-[9px] font-black uppercase rounded-full border border-slate-700">{request.terminal || 'Barra'}</span>
-                        </div>
-                        <span className="text-[10px] text-slate-400 font-bold">{new Date(request.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>
-                    </div>
-                    <h3 className={`font-black uppercase leading-tight mb-3 ${done ? 'text-emerald-500/60 line-through text-sm' : 'text-white text-lg'}`}>{stockItem.name}</h3>
-                    <div className="flex justify-between items-end mb-3 bg-slate-950/50 rounded-xl p-3 border border-white/5">
-                        <div>
-                            <p className="text-[9px] font-black text-indigo-400 uppercase mb-1">Cantidad</p>
-                            <span className="text-2xl font-black text-white">{request.quantity || 1}</span>
-                            <span className="text-xs font-bold text-slate-500 ml-1">{stockItem.unit}</span>
-                        </div>
-                        <div className="text-right text-[9px] font-bold text-slate-500">
-                            <p>Ubic: <span className="text-slate-300">{stockItem.location}</span></p>
-                        </div>
-                    </div>
-                    {!done && (
-                        <button onClick={() => handleResolve(request.id)} className="w-full py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white rounded-xl font-black uppercase text-xs flex items-center justify-center gap-2 active:scale-95 shadow-lg shadow-emerald-500/25">
-                            <Check size={18} /> Enviado ✅
-                        </button>
-                    )}
-                    {done && (
-                        <div className="w-full py-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500/70 rounded-xl font-black uppercase text-[10px] text-center flex items-center justify-center gap-2">
-                            <Check size={14} /> Hecho
-                        </div>
-                    )}
-                </div>
-            );
-        };
-
         return (
-            <div className="fixed inset-0 bg-gradient-to-br from-slate-950 via-[#0a0f1d] to-slate-950 text-white z-[500] flex flex-col h-[100dvh]">
-                <div className="relative p-3 md:p-4 bg-slate-900/80 backdrop-blur-xl border-b border-white/5 flex justify-between items-center shrink-0 z-10 shadow-2xl safe-pt">
-                    <div className="relative flex items-center gap-2 md:gap-4">
-                        <button onClick={onExit} className="p-2.5 bg-white/5 rounded-xl hover:bg-rose-500/20 text-rose-400 transition-all active:scale-95 border border-white/5 shrink-0"><LogOut size={18} /></button>
+            <div className="fixed inset-0 bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950 text-white z-[500] flex flex-col h-[100dvh]">
+                {/* HEADER LOGÍSTICA */}
+                <div className="relative p-4 bg-gradient-to-r from-blue-900/80 via-indigo-800/80 to-blue-900/80 backdrop-blur-xl border-b border-white/10 shrink-0 shadow-2xl">
+                    <div className="flex justify-between items-center">
                         <div>
-                            <h2 className="font-black text-lg md:text-2xl uppercase italic tracking-tighter bg-gradient-to-r from-white via-indigo-200 to-white bg-clip-text text-transparent">📦 LOGÍSTICA</h2>
-                            <p className="text-[9px] md:text-[10px] text-indigo-400/80 font-bold uppercase tracking-wider mt-0.5">Toca "Enviado" cuando entregues</p>
+                            <h2 className="text-2xl font-black uppercase tracking-tight bg-gradient-to-r from-white via-blue-200 to-white bg-clip-text text-transparent">
+                                📦 Logística
+                            </h2>
+                            <p className="text-xs font-bold text-blue-300/70 uppercase tracking-wider mt-0.5">
+                                Gestión de Pedidos
+                            </p>
+                        </div>
+                        <button onClick={toggleLock} className={`mr-2 p-3 rounded-full border-2 transition-all ${isLocked ? 'bg-amber-500 border-amber-500 text-slate-900' : 'bg-blue-500/20 border-blue-500/30 text-blue-300'}`}>{isLocked ? <Zap size={20} fill="currentColor" /> : <ZapOff size={20} />}</button>
+                        <button
+                            onClick={onExit}
+                            className="p-3 bg-red-500/20 hover:bg-red-500/30 rounded-full border-2 border-red-500/30 text-red-400 transition-all active:scale-95"
+                        >
+                            <LogOut size={20} />
+                        </button>
+                    </div>
+
+                    {/* CONTADOR DE PENDIENTES */}
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                        <div className="bg-blue-500/10 rounded-xl p-3 border border-blue-500/20">
+                            <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest">Pendientes</p>
+                            <p className="text-3xl font-black text-white tabular-nums">{pendingRequests.length}</p>
+                        </div>
+                        <div className="bg-emerald-500/10 rounded-xl p-3 border border-emerald-500/20">
+                            <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Entregados Hoy</p>
+                            <p className="text-3xl font-black text-white tabular-nums">
+                                {incidents.filter(inc =>
+                                    inc.status === 'RESOLVED' &&
+                                    inc.timestamp.startsWith(new Date().toISOString().split('T')[0])
+                                ).length}
+                            </p>
                         </div>
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto md:overflow-y-hidden p-3 md:p-6">
-                    <div className="flex flex-col md:flex-row md:grid md:grid-cols-2 gap-3 md:gap-5 h-auto md:h-full">
-                        {/* PENDIENTES */}
-                        <div className="w-full md:w-auto md:h-full flex flex-col bg-slate-900/40 backdrop-blur-md rounded-2xl md:rounded-[32px] border border-white/5 overflow-hidden shadow-2xl min-h-[200px] md:min-h-0">
-                            <div className="p-3 md:p-5 border-b border-white/5 bg-slate-800/50 flex justify-between items-center">
-                                <h3 className="font-black uppercase text-sm text-white flex items-center gap-2">
-                                    <div className="p-1.5 bg-amber-500/20 rounded-lg"><AlertTriangle size={16} className="text-amber-400" /></div>
-                                    Pendientes
-                                </h3>
-                                <span className="px-3 py-1 bg-amber-500 text-amber-950 font-black text-xs rounded-xl">{pendingRequests.length}</span>
-                            </div>
-                            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                                {pendingRequests.length === 0 ? (
-                                    <div className="h-full flex flex-col items-center justify-center opacity-40 text-center p-6">
-                                        <Package size={48} className="text-amber-400/50 mb-4" />
-                                        <p className="text-xs font-black uppercase text-slate-300">Todo al día 🎉</p>
-                                    </div>
-                                ) : pendingRequests.map(req => renderCard(req, false))}
-                            </div>
+                {/* LISTA DE PETICIONES */}
+                <div className="flex-1 overflow-y-auto p-4 pb-32">
+                    {pendingRequests.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full opacity-40">
+                            <Package size={64} className="text-blue-300 mb-4" />
+                            <p className="font-black uppercase text-sm text-slate-400">No hay peticiones pendientes</p>
                         </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {pendingRequests.map(request => {
+                                const stockItem = stock.find(s => s.id === request.stockItemId);
+                                if (!stockItem) return null;
 
-                        {/* COMPLETADOS HOY */}
-                        <div className="w-full md:w-auto md:h-full flex flex-col bg-slate-900/40 backdrop-blur-md rounded-2xl md:rounded-[32px] border border-white/5 overflow-hidden shadow-2xl min-h-[200px] md:min-h-0">
-                            <div className="p-3 md:p-5 border-b border-white/5 bg-emerald-900/10 flex justify-between items-center">
-                                <h3 className="font-black uppercase text-sm text-white flex items-center gap-2">
-                                    <div className="p-1.5 bg-emerald-500/20 rounded-lg"><Check size={16} className="text-emerald-400" /></div>
-                                    Hecho Hoy
-                                </h3>
-                                <span className="px-3 py-1 bg-emerald-500 text-emerald-950 font-black text-xs rounded-xl">{completedToday.length}</span>
-                            </div>
-                            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                                {completedToday.length === 0 ? (
-                                    <div className="h-full flex flex-col items-center justify-center opacity-40 text-center p-6">
-                                        <Check size={48} className="text-emerald-400/50 mb-4" />
-                                        <p className="text-xs font-black uppercase text-slate-300">Sin entregas aún</p>
+                                const isUrgent = request.priority === 'URGENT';
+                                const isSpecialAuth = request.title.includes('🔓 APROBACIÓN REQUERIDA');
+
+                                return (
+                                    <div
+                                        key={request.id}
+                                        className={`rounded-2xl p-4 border-2 ${isUrgent
+                                            ? 'bg-red-500/10 border-red-500/30'
+                                            : isSpecialAuth
+                                                ? 'bg-orange-500/10 border-orange-500/30'
+                                                : 'bg-blue-500/10 border-blue-500/20'
+                                            }`}
+                                    >
+                                        {/* Header */}
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    {isUrgent && (
+                                                        <span className="px-2 py-0.5 bg-red-500 text-white text-[9px] font-black uppercase rounded-full animate-pulse">
+                                                            🚨 Urgente
+                                                        </span>
+                                                    )}
+                                                    {isSpecialAuth && (
+                                                        <span className="px-2 py-0.5 bg-orange-500 text-white text-[9px] font-black uppercase rounded-full">
+                                                            🔓 Autorización
+                                                        </span>
+                                                    )}
+                                                    <span className="text-[9px] font-bold text-slate-400 uppercase">
+                                                        {request.terminal || 'N/A'}
+                                                    </span>
+                                                </div>
+                                                <h3 className="font-black text-lg uppercase text-white leading-tight">
+                                                    {stockItem.name}
+                                                </h3>
+                                                <p className="text-xs text-slate-400 mt-0.5">
+                                                    {new Date(request.timestamp).toLocaleTimeString('es-ES', {
+                                                        hour: '2-digit',
+                                                        minute: '2-digit'
+                                                    })}
+                                                </p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-3xl font-black text-white tabular-nums">
+                                                    {request.quantity || 1}
+                                                </p>
+                                                <p className="text-xs font-bold text-slate-400 uppercase">
+                                                    {stockItem.unit}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Info adicional */}
+                                        <div className="grid grid-cols-2 gap-2 mb-3">
+                                            <div className="bg-slate-900/50 rounded-lg p-2">
+                                                <p className="text-[9px] font-bold text-slate-500 uppercase">Stock Actual</p>
+                                                <p className={`text-lg font-black ${stockItem.quantity <= stockItem.minStock ? 'text-amber-400' : 'text-white'
+                                                    }`}>
+                                                    {stockItem.quantity} {stockItem.unit}
+                                                </p>
+                                            </div>
+                                            <div className="bg-slate-900/50 rounded-lg p-2">
+                                                <p className="text-[9px] font-bold text-slate-500 uppercase">Ubicación</p>
+                                                <p className="text-sm font-black text-white truncate">{stockItem.location}</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Botón de confirmar entrega */}
+                                        <button
+                                            onClick={() => handleMarkAsDelivered(request.id)}
+                                            className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black uppercase text-sm flex items-center justify-center gap-2 transition-all active:scale-95"
+                                        >
+                                            <Check size={18} />
+                                            Marcar como Entregado
+                                        </button>
                                     </div>
-                                ) : completedToday.map(req => renderCard(req, true))}
-                            </div>
+                                );
+                            })}
                         </div>
-                    </div>
+                    )}
                 </div>
             </div>
         );
@@ -558,63 +416,58 @@ export const KioskMode: React.FC<KioskModeProps> = ({
     // ----------------------------------------------------------------------
     const myRequests = incidents.filter(i => (i.requestedBy === userRole || i.terminal === initialMode) && i.status !== 'RESOLVED' && i.status !== 'ARCHIVED');
     const pendingCount = myRequests.filter(i => i.status === 'DELIVERED').length;
-    // Historial completo de hoy incluyendo resueltas
-    const today = new Date().toISOString().split('T')[0];
-    const allMyRequestsToday = incidents
-        .filter(i => (i.requestedBy === userRole || i.terminal === initialMode) && i.timestamp.startsWith(today))
-        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
     const itemsToShow = stock.filter(s => s.usageType === initialMode).sort((a, _b) => (a.quantity <= a.minStock ? -1 : 1));
 
     return (
         <div className="fixed inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white z-[500] flex flex-col h-[100dvh]">
             {/* HEADER PREMIUM */}
-            <div className="relative p-3 md:p-4 bg-gradient-to-r from-slate-900/80 via-slate-800/80 to-slate-900/80 backdrop-blur-xl border-b border-white/10 shrink-0 safe-pt shadow-2xl">
+            <div className="relative p-4 bg-gradient-to-r from-slate-900/80 via-slate-800/80 to-slate-900/80 backdrop-blur-xl border-b border-white/10 shrink-0 safe-pt shadow-2xl">
                 {/* Efecto de brillo en el header */}
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-pulse"></div>
 
-                <div className="relative flex justify-between items-center gap-2">
-                    <div className="flex items-center gap-2 md:gap-4 min-w-0">
-                        <button onClick={onExit} className="p-2.5 bg-gradient-to-br from-rose-500 to-rose-600 rounded-xl md:rounded-2xl hover:from-rose-600 hover:to-rose-700 shadow-lg shadow-rose-500/30 active:scale-95 transition-all shrink-0">
-                            <LogOut size={18} />
+                <div className="relative flex justify-between items-center">
+                    <div className="flex items-center gap-4">
+                        <button onClick={onExit} className="p-3 bg-gradient-to-br from-rose-500 to-rose-600 rounded-2xl hover:from-rose-600 hover:to-rose-700 shadow-lg shadow-rose-500/30 active:scale-95 transition-all">
+                            <LogOut size={22} />
                         </button>
+                        <button onClick={toggleLock} className={`p-3 rounded-2xl transition-all ${isLocked ? 'bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/40' : 'bg-slate-800/50 text-slate-400 hover:text-white border border-white/5'}`}>{isLocked ? <Zap size={22} fill="currentColor" /> : <ZapOff size={22} />}</button>
                         <button
                             onClick={() => setShowRequests(!showRequests)}
-                            className={`p-2.5 rounded-xl md:rounded-2xl transition-all relative shrink-0 ${showRequests
+                            className={`p-3 rounded-2xl transition-all relative ${showRequests
                                 ? 'bg-indigo-500/30 text-indigo-400 border border-indigo-500/50'
                                 : 'bg-slate-800/50 text-slate-400 hover:text-white border border-white/5'
                                 }`}
                         >
-                            <History size={18} />
+                            <History size={22} />
                             {pendingCount > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-slate-900 animate-pulse"></span>}
                         </button>
-                        <div className="min-w-0">
-                            <h2 className="font-black text-base md:text-2xl uppercase italic tracking-tight bg-gradient-to-r from-white via-blue-200 to-white bg-clip-text text-transparent truncate">
+                        <div>
+                            <h2 className="font-black text-xl md:text-2xl uppercase italic tracking-tight bg-gradient-to-r from-white via-blue-200 to-white bg-clip-text text-transparent">
                                 Almacén {initialMode}
                             </h2>
-                            <p className="text-[9px] md:text-xs text-slate-400 font-bold uppercase tracking-wider md:tracking-widest flex items-center gap-1.5 mt-0.5">
-                                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
-                                <span className="hidden sm:inline">Toca para solicitar</span>
-                                <span className="sm:hidden">Solicitar</span>
+                            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2 mt-1">
+                                <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
+                                Toca para solicitar reposición
                             </p>
                         </div>
                     </div>
 
-                    <div className="flex gap-2 items-center shrink-0">
+                    <div className="flex gap-3 items-center">
                         {/* BOTÓN DE TICKETS SOLO VISIBLE PARA CAJERO */}
                         {userRole === 'CAJERO' && (
-                            <button onClick={() => setShowCounter(true)} className="p-2.5 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl md:rounded-2xl hover:from-indigo-500 hover:to-purple-500 shadow-lg shadow-indigo-500/30 transition-all">
-                                <Ticket size={18} />
+                            <button onClick={() => setShowCounter(true)} className="p-3 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl hover:from-indigo-500 hover:to-purple-500 shadow-lg shadow-indigo-500/30 transition-all">
+                                <Ticket size={22} />
                             </button>
                         )}
 
                         {/* Selector de carga de trabajo mejorado */}
-                        <div className="flex bg-slate-950/50 backdrop-blur-sm rounded-xl md:rounded-2xl p-1 md:p-1.5 border border-white/10 shadow-lg">
+                        <div className="flex bg-slate-950/50 backdrop-blur-sm rounded-2xl p-1.5 border border-white/10 shadow-lg">
                             {(['BAJA', 'NORMAL', 'ALTA'] as KioskWorkload[]).map(w => (
                                 <button
                                     key={w}
                                     onClick={() => setWorkload(w)}
-                                    className={`px-2.5 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-[10px] md:text-xs font-black uppercase transition-all ${workload === w
+                                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase transition-all ${workload === w
                                         ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg'
                                         : 'text-slate-500 hover:text-slate-300'
                                         }`}
@@ -625,128 +478,106 @@ export const KioskMode: React.FC<KioskModeProps> = ({
                         </div>
                     </div>
                 </div>
-
-                {selectedCategory && (
-                    <div className="absolute bottom-0 left-0 right-0 z-20 translate-y-1/2 flex justify-center">
-                        <button
-                            onClick={() => setSelectedCategory(null)}
-                            className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-2 rounded-full font-black uppercase text-xs tracking-widest border border-white/10 shadow-xl flex items-center gap-2 transition-all active:scale-95"
-                        >
-                            <X size={14} /> Volver a Categorías
-                        </button>
-                    </div>
-                )}
             </div>
 
             {/* GRID STOCK PREMIUM */}
-            <div className="flex-1 overflow-y-auto p-3 md:p-6 pb-28">
-                {!selectedCategory ? (
-                    /* VIEW 1: CATEGORY SELECTION */
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-5 animate-in fade-in zoom-in-95 duration-300">
-                        {Array.from(new Set(itemsToShow.map(i => i.category || 'VARIOS'))).map(categoryName => {
-                            const count = itemsToShow.filter(i => (i.category || 'VARIOS') === categoryName).length;
-                            return (
-                                <button
-                                    key={categoryName}
-                                    onClick={() => setSelectedCategory(categoryName)}
-                                    className="group relative rounded-[32px] overflow-hidden cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl active:scale-95 bg-slate-900 border border-white/10 aspect-square flex flex-col items-center justify-center p-6"
-                                >
-                                    <div className="absolute inset-0 bg-gradient-to-t from-indigo-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                                    <span className="text-6xl drop-shadow-xl group-hover:scale-110 transition-transform mb-4">
-                                        {getCatEmoji(categoryName)}
-                                    </span>
-                                    <h3 className="font-black text-lg md:text-xl uppercase text-white tracking-tight mb-2">{categoryName}</h3>
-                                    <span className="text-[10px] font-bold uppercase text-indigo-400 bg-indigo-500/10 px-3 py-1 rounded-full">{count} Productos</span>
-                                </button>
-                            );
-                        })}
-                    </div>
-                ) : (
-                    /* VIEW 2: PRODUCT LIST BY CATEGORY */
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-5 animate-in fade-in slide-in-from-right-8 duration-300">
-                        {itemsToShow.filter(i => (i.category || 'VARIOS') === selectedCategory).map(item => {
-                            const isLow = item.quantity <= item.minStock;
-                            const limit = item.dailyLimit || 0;
-                            const todayUsage = limit > 0 ? getTodayUsage(item.id) : 0;
-                            const remaining = Math.max(0, limit - todayUsage);
-                            const stockPercent = item.minStock > 0 ? Math.min((item.quantity / (item.minStock * 2)) * 100, 100) : 100;
-                            const catEmoji = getCatEmoji(item.category);
+            <div className="flex-1 overflow-y-auto p-6 pb-32">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
+                    {itemsToShow.map(item => {
+                        const isLow = item.quantity <= item.minStock;
+                        const limit = item.dailyLimit || 0;
+                        const todayUsage = limit > 0 ? getTodayUsage(item.id) : 0;
+                        const remaining = Math.max(0, limit - todayUsage);
 
-                            return (
-                                <button
-                                    key={item.id}
-                                    onClick={() => { setRestockItem(item); setRestockQty(1); }}
-                                    className={`group relative rounded-[28px] overflow-hidden cursor-pointer transition-all duration-300
-                                      hover:-translate-y-1 hover:shadow-2xl active:scale-95
-                                      ${isLow
-                                            ? 'bg-gradient-to-br from-amber-500/10 to-red-500/10 border-2 border-amber-500/50 shadow-lg shadow-amber-500/10 hover:shadow-amber-500/30'
-                                            : 'bg-white/[0.04] border-2 border-white/10 hover:border-indigo-500/40 hover:shadow-indigo-500/20'
-                                        }`}
-                                >
-                                    {/* Glow effect */}
-                                    <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ${isLow ? 'bg-gradient-to-t from-amber-500/10 to-transparent' : 'bg-gradient-to-t from-indigo-500/10 to-transparent'}`}></div>
+                        // Gradientes únicos según el estado
+                        const cardGradient = isLow
+                            ? 'from-amber-500/20 via-orange-500/20 to-red-500/20'
+                            : 'from-slate-800/50 via-slate-700/50 to-slate-800/50';
 
-                                    {/* Content */}
-                                    <div className="relative z-10 p-3 md:p-4 flex flex-col h-[150px] md:h-[180px]">
-                                        {/* Top row: photo/emoji + badge */}
-                                        <div className="flex justify-between items-start mb-2">
-                                            {item.imageUrl ? (
-                                                <img src={item.imageUrl} alt={item.name} className="w-12 h-12 rounded-xl object-cover border-2 border-white/20 shadow-lg group-hover:scale-110 transition-transform" onError={(e) => { const el = e.currentTarget; el.style.display = 'none'; }} />
-                                            ) : null}
-                                            <span className={`text-3xl drop-shadow-lg group-hover:scale-110 transition-transform ${item.imageUrl ? 'hidden' : ''}`}>{catEmoji}</span>
-                                            {isLow && (
-                                                <span className="px-2 py-0.5 bg-amber-500 text-[9px] font-black uppercase rounded-full text-amber-950 animate-pulse shadow-lg">⚠ Bajo</span>
-                                            )}
-                                            {limit > 0 && !isLow && (
-                                                <span className="px-2 py-0.5 bg-slate-700/80 text-[9px] font-black uppercase rounded-full text-slate-300 border border-white/10">{remaining}/{limit}</span>
-                                            )}
-                                        </div>
+                        const borderColor = isLow
+                            ? 'border-amber-500/40'
+                            : 'border-slate-600/30 hover:border-blue-500/50';
 
-                                        {/* Product name */}
-                                        <h4 className="font-black text-sm uppercase text-white leading-snug line-clamp-2 mb-auto tracking-tight">
-                                            {item.name}
-                                        </h4>
+                        return (
+                            <button
+                                key={item.id}
+                                onClick={() => { setRestockItem(item); setRestockQty(1); }}
+                                className={`group relative p-5 rounded-[24px] bg-gradient-to-br ${cardGradient} backdrop-blur-md border-2 ${borderColor}
+                                      flex flex-col min-h-[240px] cursor-pointer transition-all duration-300
+                                      hover:scale-105 hover:shadow-2xl ${isLow ? 'hover:shadow-amber-500/30' : 'hover:shadow-blue-500/20'}
+                                      active:scale-95 overflow-hidden`}
+                            >
+                                {/* Efecto de brillo al hover */}
+                                <div className="absolute inset-0 bg-gradient-to-br from-white/0 via-white/5 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity rounded-[24px]"></div>
 
-                                        {/* Bottom: stock bar + number */}
-                                        <div className="mt-3 space-y-2">
-                                            {/* Stock progress bar */}
-                                            <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
-                                                <div
-                                                    className={`h-full rounded-full transition-all duration-700 ${isLow ? 'bg-gradient-to-r from-amber-500 to-red-500' : 'bg-gradient-to-r from-emerald-500 to-cyan-400'}`}
-                                                    style={{ width: `${stockPercent}%` }}
-                                                ></div>
-                                            </div>
+                                {/* Partículas decorativas */}
+                                <div className="absolute top-3 right-3 w-20 h-20 bg-gradient-to-br from-white/5 to-transparent rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
 
-                                            {/* Stock number */}
-                                            <div className="flex justify-between items-baseline">
-                                                <span className="text-[9px] font-bold text-slate-500 uppercase">Stock</span>
-                                                <div className="flex items-baseline gap-1">
-                                                    <span className={`text-xl font-black tabular-nums ${isLow ? 'text-amber-400' : 'text-white'}`}>{item.quantity}</span>
-                                                    <span className="text-[10px] font-bold text-slate-500">{item.unit}</span>
-                                                </div>
-                                            </div>
-                                        </div>
+                                {/* Header con icono y badge */}
+                                <div className="relative z-10 flex justify-between items-start mb-3">
+                                    <div className={`p-2.5 rounded-xl backdrop-blur-sm shadow-lg ${isLow
+                                        ? 'bg-amber-500/20 text-amber-300 shadow-amber-500/20'
+                                        : 'bg-blue-500/20 text-blue-300 shadow-blue-500/20'
+                                        }`}>
+                                        {item.category.includes('BEBIDA') ? <Wine size={20} /> : <Package size={20} />}
                                     </div>
-                                </button>
-                            );
-                        })}
-                    </div>
-                )}
+                                    {isLow && (
+                                        <div className="flex items-center gap-1 bg-amber-500/90 text-amber-950 px-2.5 py-1 rounded-full shadow-lg animate-pulse">
+                                            <AlertTriangle size={12} />
+                                            <span className="text-[10px] font-black uppercase">Bajo</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Nombre del producto */}
+                                <h4 className="relative z-10 font-black text-base uppercase text-white leading-tight mb-4 line-clamp-2 drop-shadow-lg min-h-[2.5rem]">
+                                    {item.name}
+                                </h4>
+
+                                {/* Información inferior */}
+                                <div className="relative z-10 mt-auto space-y-2.5">
+                                    {limit > 0 ? (
+                                        <div className="bg-slate-950/50 backdrop-blur-sm rounded-xl p-2.5 border border-white/10">
+                                            <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Cupo Diario</p>
+                                            <div className="flex items-baseline gap-1.5">
+                                                <span className="text-2xl font-black text-white drop-shadow-lg">{remaining}</span>
+                                                <span className="text-xs text-slate-500">/ {limit}</span>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-emerald-500/20 to-green-500/20 px-2.5 py-2 rounded-xl border border-emerald-500/30">
+                                            <Zap size={14} className="text-emerald-400" />
+                                            <span className="text-[10px] font-black uppercase text-emerald-300">Barra Libre</span>
+                                        </div>
+                                    )}
+
+                                    <div className="flex justify-between items-center bg-slate-950/50 backdrop-blur-sm rounded-xl p-2.5 border border-white/10">
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase">Stock</span>
+                                        <span className={`text-xl font-black drop-shadow-lg ${isLow ? 'text-amber-400' : 'text-white'
+                                            }`}>
+                                            {item.quantity}
+                                        </span>
+                                    </div>
+                                </div>
+                            </button>
+                        );
+                    })}
+                </div>
             </div>
 
             {/* BOTTOM BAR PREMIUM */}
-            <div className="absolute bottom-0 left-0 right-0 p-3 md:p-6 bg-slate-950/95 backdrop-blur-2xl border-t border-white/10 z-40 shadow-2xl safe-pb">
+            <div className="absolute bottom-0 left-0 right-0 p-6 bg-slate-950/95 backdrop-blur-2xl border-t border-white/10 z-40 shadow-2xl safe-pb">
                 <button
                     onClick={handleIceRequest}
-                    className="w-full py-4 md:py-5 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl md:rounded-[24px] text-white flex items-center justify-center gap-2 md:gap-3 
+                    className="w-full py-5 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-[24px] text-white flex items-center justify-center gap-3 
                           shadow-[0_8px_30px_rgba(6,182,212,0.4)] hover:shadow-[0_8px_40px_rgba(6,182,212,0.6)]
                           active:scale-98 transition-all group relative overflow-hidden"
                 >
                     {/* Efecto de brillo animado */}
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
 
-                    <Snowflake size={22} className="animate-spin-slow relative z-10" />
-                    <span className="font-black text-sm md:text-lg uppercase tracking-wider relative z-10">Pedir Hielo</span>
+                    <Snowflake size={28} className="animate-spin-slow relative z-10" />
+                    <span className="font-black text-lg uppercase tracking-wider relative z-10">Pedir Hielo Urgente</span>
                 </button>
             </div>
 
@@ -940,76 +771,50 @@ export const KioskMode: React.FC<KioskModeProps> = ({
             {showRequests && (
                 <div className="fixed inset-0 z-[600] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
                     <div className="bg-slate-900 border-2 border-slate-700 w-full max-w-md rounded-[32px] p-6 max-h-[80vh] flex flex-col">
-                        <div className="flex justify-between items-center mb-4 shrink-0">
+                        <div className="flex justify-between items-center mb-6 shrink-0">
                             <div>
                                 <h3 className="text-xl font-black text-white uppercase">Mis Peticiones</h3>
-                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Historial hoy · {allMyRequestsToday.length} solicitudes</p>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Historial de solicitudes</p>
                             </div>
                             <button onClick={() => setShowRequests(false)} className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white"><X /></button>
                         </div>
 
-                        {/* SEMÁFORO RESUMEN */}
-                        <div className="flex gap-2 mb-4 shrink-0">
-                            <div className="flex-1 bg-rose-500/20 border border-rose-500/30 rounded-xl p-2 text-center">
-                                <p className="text-[9px] font-bold text-rose-300">🔴 Pendiente</p>
-                                <p className="text-lg font-black text-white">{allMyRequestsToday.filter(i => i.status === 'OPEN' || i.status === 'PENDING_APPROVAL').length}</p>
-                            </div>
-                            <div className="flex-1 bg-amber-500/20 border border-amber-500/30 rounded-xl p-2 text-center">
-                                <p className="text-[9px] font-bold text-amber-300">🟡 En camino</p>
-                                <p className="text-lg font-black text-white">{allMyRequestsToday.filter(i => i.status === 'DELIVERED').length}</p>
-                            </div>
-                            <div className="flex-1 bg-emerald-500/20 border border-emerald-500/30 rounded-xl p-2 text-center">
-                                <p className="text-[9px] font-bold text-emerald-300">🟢 Hecho</p>
-                                <p className="text-lg font-black text-white">{allMyRequestsToday.filter(i => i.status === 'RESOLVED' || i.status === 'ARCHIVED').length}</p>
-                            </div>
-                        </div>
-
                         <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
-                            {allMyRequestsToday.length === 0 ? (
+                            {myRequests.length === 0 ? (
                                 <div className="py-10 text-center text-slate-500 font-bold uppercase text-xs opacity-50 flex flex-col items-center gap-3">
                                     <History size={48} />
-                                    No tienes peticiones hoy
+                                    No tienes peticiones activas
                                 </div>
                             ) : (
-                                allMyRequestsToday.map(req => {
+                                myRequests.map(req => {
                                     const stockItem = stock.find(s => s.id === req.stockItemId);
                                     if (!stockItem) return null;
 
                                     const isDelivered = req.status === 'DELIVERED';
                                     const isPendingApproval = req.status === 'PENDING_APPROVAL';
-                                    const isResolved = req.status === 'RESOLVED' || req.status === 'ARCHIVED';
-                                    const isOpen = req.status === 'OPEN';
-                                    const statusIcon = isResolved ? '✅' : isDelivered ? '🟡' : isPendingApproval ? '🟠' : '🔴';
-                                    const statusLabel = isResolved ? 'Recibido' : isDelivered ? 'Listo para recoger' : isPendingApproval ? 'Esperando Aprobación' : 'Pendiente';
-                                    const time = new Date(req.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
 
                                     return (
-                                        <div key={req.id} className={`p-4 rounded-2xl border ${isResolved
-                                            ? 'bg-emerald-500/5 border-emerald-500/20 opacity-70'
-                                            : isDelivered
-                                                ? 'bg-emerald-500/10 border-emerald-500/30'
-                                                : isPendingApproval
-                                                    ? 'bg-orange-500/10 border-orange-500/30'
-                                                    : 'bg-slate-800/50 border-slate-700/50'
+                                        <div key={req.id} className={`p-4 rounded-2xl border ${isDelivered
+                                            ? 'bg-emerald-500/10 border-emerald-500/30'
+                                            : isPendingApproval
+                                                ? 'bg-orange-500/10 border-orange-500/30'
+                                                : 'bg-slate-800/50 border-slate-700/50'
                                             }`}>
                                             <div className="flex justify-between items-start mb-2">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-lg">{statusIcon}</span>
-                                                    <h4 className="font-black text-white uppercase">{stockItem.name}</h4>
-                                                </div>
-                                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${isResolved ? 'bg-emerald-800 text-emerald-300' : isDelivered ? 'bg-emerald-500 text-slate-900' :
+                                                <h4 className="font-black text-white uppercase">{stockItem.name}</h4>
+                                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${isDelivered ? 'bg-emerald-500 text-slate-900' :
                                                     isPendingApproval ? 'bg-orange-500 text-slate-900 animate-pulse' :
                                                         'bg-blue-500 text-white'
                                                     }`}>
-                                                    {statusLabel}
+                                                    {isDelivered ? 'Listo' : isPendingApproval ? 'Esperando Aprobación' : 'En Proceso'}
                                                 </span>
                                             </div>
                                             <div className="flex justify-between items-end">
                                                 <div className="text-xs text-slate-400">
                                                     <p>Cantidad: <span className="text-white font-bold">{req.quantity} {stockItem.unit}</span></p>
-                                                    <p className="text-[10px]">📍 {time} · {req.justification ? 'Autorización Especial' : 'Reposición Normal'}</p>
+                                                    <p>{req.justification ? 'Autorización Especial' : 'Reposición Normal'}</p>
                                                 </div>
-                                                {isDelivered && !isResolved && (
+                                                {isDelivered && (
                                                     <button
                                                         onClick={() => {
                                                             if (confirm('¿Confirmas que has recibido este pedido? Se descontará del stock.')) {
@@ -1027,62 +832,6 @@ export const KioskMode: React.FC<KioskModeProps> = ({
                                     );
                                 })
                             )}
-                        </div>
-                    </div>
-                </div>
-            )}
-            {/* MODAL PEDIR CAMBIO/SUELTO */}
-            {showChangeRequestModal && (
-                <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
-                    <div className="bg-white p-6 md:p-8 rounded-[40px] w-full max-w-sm shadow-2xl animate-in zoom-in-95 border-4 border-amber-500">
-                        <div className="text-center mb-6">
-                            <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4 border-2 border-amber-300 transform -rotate-6">
-                                <AlertTriangle size={32} className="text-amber-600" />
-                            </div>
-                            <h3 className="text-2xl font-black uppercase tracking-tighter">Necesitamos Cambio</h3>
-                            <p className="text-slate-500 text-sm mt-1">¿Cuánto suelto necesitas en caja?</p>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 mb-4">
-                            {[20, 50, 100, 200].map(amt => (
-                                <button
-                                    key={amt}
-                                    onClick={() => setChangeRequestAmount(amt)}
-                                    className={`py-4 rounded-xl font-black text-xl border-2 transition-all ${changeRequestAmount === amt
-                                        ? 'bg-amber-500 border-amber-600 text-slate-900'
-                                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-amber-400'
-                                        }`}
-                                >
-                                    {amt}€
-                                </button>
-                            ))}
-                        </div>
-
-                        <div className="mb-6">
-                            <label className="text-xs font-bold text-slate-400 uppercase ml-2 mb-1 block">Otra cantidad (€)</label>
-                            <input
-                                type="number"
-                                placeholder="Escribe cantidad..."
-                                value={changeRequestAmount}
-                                onChange={e => setChangeRequestAmount(Number(e.target.value) || '')}
-                                className="w-full bg-slate-50 p-4 border-2 border-slate-200 rounded-xl font-black text-center text-xl outline-none focus:border-amber-500"
-                            />
-                        </div>
-
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setShowChangeRequestModal(false)}
-                                className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold uppercase text-sm"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={() => handleChangeRequest(changeRequestAmount)}
-                                disabled={!changeRequestAmount}
-                                className="flex-1 py-4 bg-amber-500 hover:bg-amber-600 text-slate-900 rounded-xl font-black uppercase text-sm disabled:opacity-50 border-b-4 border-amber-700 active:border-b-0 active:translate-y-1"
-                            >
-                                Enviar Aviso
-                            </button>
                         </div>
                     </div>
                 </div>
