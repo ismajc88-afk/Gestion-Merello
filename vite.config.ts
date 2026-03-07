@@ -10,8 +10,7 @@ export default defineConfig({
       registerType: 'prompt',
       injectRegister: 'auto',
       workbox: {
-        cleanupOutdatedCaches: true,
-        skipWaiting: true
+        cleanupOutdatedCaches: true
       }
     })
   ],
