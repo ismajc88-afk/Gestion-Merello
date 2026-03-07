@@ -29,7 +29,11 @@ export function PWABadge() {
                 </button>
             </div>
             <button
-                onClick={() => updateServiceWorker(true)}
+                onClick={() => {
+                    updateServiceWorker(true);
+                    // Forzar recarga si el Service Worker tarda en enviar el evento de confirmación
+                    setTimeout(() => window.location.reload(), 800);
+                }}
                 className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs uppercase tracking-widest rounded-xl flex items-center justify-center gap-2 transition-colors"
             >
                 <RefreshCw size={14} />
