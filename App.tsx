@@ -24,6 +24,7 @@ import { ToolsManager } from './components/ToolsModules';
 import { HelpGuide } from './components/HelpGuide';
 import { KioskMode } from './components/KioskMode';
 
+import { PWABadge } from './components/PWABadge';
 import { WorkGroupManager } from './components/WorkGroupManager';
 import { Task, KioskWorkload, TransactionType, Incident, UserRole } from './types';
 import { Siren } from 'lucide-react';
@@ -516,6 +517,7 @@ const App: React.FC = () => {
     return (
         <Layout currentView={currentView} onChangeView={setCurrentView} userRole={userRole} onLogout={() => setUserRole(null)} peerCount={peerCount} onForceSync={() => { }}>
             <GlobalAlertOverlay />
+            <PWABadge />
             <audio ref={silentAudioRef} src={SILENT_MP3} loop muted style={{ display: 'none' }} />
             {renderContent()}
         </Layout>
