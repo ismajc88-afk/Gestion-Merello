@@ -1,4 +1,12 @@
 
+export interface RouteStop {
+  id: string;
+  name: string;
+  address: string;
+  timeExp?: string;
+  role: 'FMI' | 'PI' | 'FM' | 'P' | 'BANDA' | 'CASAL' | 'OTHER';
+}
+
 export enum TransactionType {
   INCOME = 'INCOME',
   EXPENSE = 'EXPENSE'

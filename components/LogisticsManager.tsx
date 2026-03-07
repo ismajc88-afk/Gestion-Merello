@@ -4,9 +4,10 @@ import { Task, Member, TaskStatus } from '../types';
 import {
    Briefcase, Plus,
    Clock, UtensilsCrossed,
-   X, CheckSquare, Square
+   X, CheckSquare, Square, Navigation
 } from 'lucide-react';
 import { RecipeCalculator } from './logistics/RecipeCalculator';
+import { PasacallesRoute } from './logistics/PasacallesRoute';
 import { ShoppingItem } from '../types';
 
 interface Props {
@@ -25,7 +26,7 @@ export const LogisticsManager: React.FC<Props> = ({ tasks, members, onAddTask, o
    const priorityFilter = 'ALL';
    const [isModalOpen, setIsModalOpen] = useState(false);
    const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-   const [activeTab, setActiveTab] = useState<'TASKS' | 'RECIPES'>('TASKS');
+   const [activeTab, setActiveTab] = useState<'TASKS' | 'RECIPES' | 'ROUTE'>('TASKS');
 
    const hapticClick = () => { if ("vibrate" in navigator) navigator.vibrate(20); };
 
@@ -98,17 +99,24 @@ export const LogisticsManager: React.FC<Props> = ({ tasks, members, onAddTask, o
                <div className="flex gap-2 mt-4 bg-slate-100 p-1 rounded-2xl w-fit">
                   <button
                      onClick={() => setActiveTab('TASKS')}
-                     className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'TASKS' ? 'bg-white shadow text-slate-800' : 'text-slate-400 hover:text-slate-600'
+                     className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'TASKS' ? 'bg-white shadow text-slate-800' : 'text-slate-400 hover:text-slate-600'
                         }`}
                   >
                      <Briefcase size={14} className="inline mr-1" /> Tareas
                   </button>
                   <button
                      onClick={() => setActiveTab('RECIPES')}
-                     className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'RECIPES' ? 'bg-white shadow text-slate-800' : 'text-slate-400 hover:text-slate-600'
+                     className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'RECIPES' ? 'bg-white shadow text-slate-800' : 'text-slate-400 hover:text-slate-600'
                         }`}
                   >
                      <UtensilsCrossed size={14} className="inline mr-1" /> Calculadora Menús
+                  </button>
+                  <button
+                     onClick={() => setActiveTab('ROUTE')}
+                     className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'ROUTE' ? 'bg-white shadow text-slate-800' : 'text-slate-400 hover:text-slate-600'
+                        }`}
+                  >
+                     <Navigation size={14} className="inline mr-1" /> Ruta Pasacalles
                   </button>
                </div>
             </div>
@@ -186,11 +194,15 @@ export const LogisticsManager: React.FC<Props> = ({ tasks, members, onAddTask, o
                   </div>
                )}
             </div>
-         ) : (
+         ) : activeTab === 'RECIPES' ? (
             <div className="flex-1 overflow-y-auto pb-32">
                <RecipeCalculator
                   onAddShoppingItems={onAddShoppingItems || (() => { })}
                />
+            </div>
+         ) : (
+            <div className="flex-1 overflow-y-auto pb-32">
+               <PasacallesRoute />
             </div>
          )}
       </div>
