@@ -1,167 +1,105 @@
-/**
- * geminiService.ts
- * Llama directamente a la REST API de Gemini — 100% compatible con navegadores.
- */
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent';
+import { GoogleGenAI } from "@google/genai";
 
-const SYSTEM_INSTRUCTION = `Eres el asistente inteligente de gestión de la Falla Eduardo Merello 2026, llamado "Merello AI".
+let aiInstance: GoogleGenAI | null = null;
 
-REGLAS OBLIGATORIAS:
-1. Responde ÚNICA Y EXCLUSIVAMENTE en ESPAÑOL.
-2. Usa párrafos cortos (máximo 2-3 líneas).
-3. Usa listas con guiones (-) para enumerar datos o pasos.
-4. Usa MAYÚSCULAS para resaltar cifras importantes.
-5. Basa tus respuestas en los DATOS ACTUALES JSON proporcionados.
-6. Si el dato no está en el JSON, di "no tengo ese dato registrado". NO INVENTES CIFRAS.
-7. Sé práctico, concreto y directo. Eres un gestor fallero veterano.
-8. Respuestas breves para lectura cómoda en móvil.`;
+// Modelos de respaldo: si uno está saturado, prueba el siguiente
+const MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'];
 
 const getApiKey = (): string => {
-  const key = import.meta.env.VITE_GEMINI_API_KEY;
-  if (key) return key;
-  console.warn('[Merello AI] VITE_GEMINI_API_KEY no encontrada en .env.local');
+  if (import.meta.env.VITE_GEMINI_API_KEY) {
+    return import.meta.env.VITE_GEMINI_API_KEY;
+  }
+  try {
+    if (typeof window !== 'undefined' && (window as any).process?.env?.API_KEY) {
+      return (window as any).process.env.API_KEY;
+    }
+  } catch (e) { }
+  console.warn('Gemini API Key not found. Please set VITE_GEMINI_API_KEY in .env.local');
   return '';
+}
+
+const getAiInstance = () => {
+  if (!aiInstance) {
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      console.error("Gemini Service: API Key no encontrada en el entorno.");
+      throw new Error("API Key missing");
+    }
+    aiInstance = new GoogleGenAI({ apiKey });
+  }
+  return aiInstance;
 };
 
-export const generateFallasAdvice = async (
-  prompt: string,
-  contextData: string
-): Promise<string> => {
-  const apiKey = getApiKey();
+const SYSTEM_PROMPT = `Eres 'Chispas', el Asistente de Gestión de la Falla Merello 2026.
 
-  if (!apiKey) {
-    return '⚠️ Sin clave API configurada. Verifica que VITE_GEMINI_API_KEY está en el archivo .env.local y reinicia el servidor.';
-  }
+REGLAS DE RESPUESTA (OBLIGATORIAS):
+1.  **IDIOMA:** Responde ÚNICA Y EXCLUSIVAMENTE en **ESPAÑOL**.
+2.  **ESTRUCTURA:**
+    *   Usa **párrafos cortos** (máximo 2-3 líneas).
+    *   Usa **listas con guiones (-)** para enumerar datos o pasos.
+    *   Usa MAYÚSCULAS para resaltar palabras clave o cifras importantes (ej: "PRESUPUESTO: 500€").
+    *   Evita bloques de texto densos. La legibilidad en móvil es prioridad.
+3.  **VERACIDAD Y DATOS:**
+    *   Basa tus respuestas estrictamente en el JSON de 'DATOS ACTUALES'.
+    *   Si te preguntan un dato (dinero, stock, nombres) que NO está en el JSON, di: "No tengo ese dato registrado". **NO INVENTES CIFRAS**.
+4.  **CONSEJOS EXPERTOS:**
+    *   Si piden ideas (menús, organización), actúa como un gestor fallero veterano: práctico, ahorrador y eficiente.
+    *   Usa jerga fallera con moderación (Casal, Mascletà, "Fer Falla") para dar contexto, pero mantén la profesionalidad.
 
-  const fullPrompt = `DATOS ACTUALES DE LA FALLA (JSON):\n${contextData}\n\nPREGUNTA: ${prompt}`;
+TU OBJETIVO: Dar una respuesta útil, rápida y fácil de leer para un directivo ocupado.`;
 
-  try {
-    const res = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        system_instruction: {
-          parts: [{ text: SYSTEM_INSTRUCTION }]
-        },
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: fullPrompt }]
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+export const generateFallasAdvice = async (prompt: string, contextData: string): Promise<string> => {
+  const ai = getAiInstance();
+
+  // Intentar con cada modelo disponible (fallback automático si hay 429)
+  for (let modelIdx = 0; modelIdx < MODELS.length; modelIdx++) {
+    const model = MODELS[modelIdx];
+
+    // Hasta 2 reintentos por modelo
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        console.log(`[Chispas AI] Intentando modelo: ${model} (intento ${attempt + 1})`);
+        const response = await ai.models.generateContent({
+          model,
+          contents: `DATOS ACTUALES DE LA FALLA (JSON): ${contextData}\n\nPREGUNTA DEL USUARIO: ${prompt}`,
+          config: {
+            temperature: 0.4,
+            systemInstruction: SYSTEM_PROMPT,
           }
-        ],
-        generationConfig: {
-          temperature: 0.4,
-          maxOutputTokens: 800,
-        }
-      })
-    });
+        });
+        return response.text || "No he podido generar una respuesta coherente.";
+      } catch (error: any) {
+        const msg = error.message || error.toString();
+        console.warn(`[Chispas AI] Error con ${model}: ${msg.substring(0, 120)}`);
 
-    if (!res.ok) {
-      const errBody = await res.json().catch(() => ({}));
-      const errMsg = errBody?.error?.message || res.statusText;
-      console.error('[Merello AI] Error HTTP', res.status, errMsg);
-
-      if (res.status === 400) return `Error de configuración (400): ${errMsg}`;
-      if (res.status === 403) return '🔒 Clave API inválida o sin permisos para Gemini (error 403). Verifica la clave en .env.local';
-      if (res.status === 429) return '⏳ Demasiadas peticiones a la IA (error 429). Espera unos segundos e inténtalo de nuevo.';
-      return `Error ${res.status}: ${errMsg}`;
-    }
-
-    const json = await res.json();
-    const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!text) {
-      console.error('[Merello AI] Respuesta vacía:', JSON.stringify(json));
-      return 'La IA no generó una respuesta. Inténtalo de nuevo.';
-    }
-
-    return text;
-  } catch (err: any) {
-    console.error('[Merello AI] Error de red:', err);
-    if (err?.message?.includes('fetch')) {
-      return '📡 Error de conexión. Comprueba tu internet e inténtalo de nuevo.';
-    }
-    return `Error inesperado: ${err?.message || 'desconocido'}`;
-  }
-};
-
-/**
- * Escanea un albarán / factura en base64 y devuelve un array JSON de artículos.
- */
-export const scanInvoiceToOrder = async (
-  base64Image: string,
-  mimeType: string = 'image/jpeg'
-): Promise<{ name: string; quantity: number; defaultPrice: number }[] | null> => {
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    console.error('Sin clave API de Gemini configurada.');
-    return null;
-  }
-
-  // Eliminamos el prefijo data:image/...;base64, si lo lleva
-  const cleanBase64 = base64Image.split(',')[1] || base64Image;
-
-  const SCAN_INSTRUCTION = `Eres una herramienta de extracción de datos de compras para un ERP de supermercado/bar.
-Instrucciones obligatorias:
-1. Extrae de la factura o lista de la compra proporcionada la matriz de productos.
-2. Cada producto debe tener "name" (string, nombre claro y directo), "quantity" (number, cantidad detectada o 1 por defecto) y "defaultPrice" (number, precio total de la fila dividido cantidad, o coste unitario, 0 por defecto).
-3. Tu salida debe ser ÚNICA y EXCLUSIVAMENTE un Array JSON válido. NO uses Markdown, NO uses comillas \`\`\`, solo texto JSON puro.`;
-
-  try {
-    const res = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        system_instruction: {
-          parts: [{ text: SCAN_INSTRUCTION }]
-        },
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              { text: "Extrae los artículos de esta factura en formato JSON." },
-              {
-                inline_data: {
-                  mime_type: mimeType,
-                  data: cleanBase64
-                }
-              }
-            ]
+        // Si es error de cuota (429), esperar e intentar con el siguiente modelo
+        if (msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED")) {
+          if (attempt === 0) {
+            // Primer intento: esperar 3 segundos y reintentar mismo modelo
+            await sleep(3000);
+            continue;
           }
-        ],
-        generationConfig: {
-          temperature: 0.1,
-          responseMimeType: 'application/json'
+          // Segundo intento fallido: pasar al siguiente modelo
+          console.log(`[Chispas AI] Modelo ${model} saturado, probando siguiente...`);
+          break;
         }
-      })
-    });
 
-    if (!res.ok) {
-      console.error('[Merello AI] Error vision:', await res.text());
-      return null;
+        // Errores no recuperables: devolver mensaje claro
+        if (msg.includes("API Key") || msg.includes("API key")) {
+          return "🔑 Error de Configuración: No se detecta una Clave API válida. Verifica el archivo .env.local";
+        }
+        if (msg.includes("403")) return "🔒 Clave API inválida o sin permisos para Gemini (error 403). Verifica la clave en .env.local";
+        if (msg.includes("404")) return "❌ El modelo configurado no está disponible. Contacta al administrador.";
+        if (msg.includes("fetch failed")) return "📡 Error de Conexión: No se pudo contactar con Google Gemini. Revisa tu internet.";
+
+        return `Lo siento, ocurrió un error técnico: ${msg.substring(0, 100)}...`;
+      }
     }
-
-    const json = await res.json();
-    const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!text) {
-      console.error('[Merello AI] Respuesta vacía en escaneo:', JSON.stringify(json));
-      return null;
-    }
-
-    try {
-      // Limpieza preventiva por si el LLM cuela Markdown
-      const cleanJson = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-      const items = JSON.parse(cleanJson);
-      if (Array.isArray(items)) return items;
-      return null;
-    } catch (parseErr) {
-      console.error('[Merello AI] Error parseando JSON de factura:', parseErr, text);
-      return null;
-    }
-  } catch (err) {
-    console.error('[Merello AI] Error red escaneo:', err);
-    return null;
   }
+
+  // Si todos los modelos están saturados
+  return "⏳ Los servidores de IA están saturados en este momento. Todos los modelos disponibles han alcanzado su límite. Inténtalo en unos minutos.";
 };

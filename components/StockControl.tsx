@@ -1,22 +1,21 @@
 
 import React, { useState, useMemo } from 'react';
-import { StockItem, BarSession, Incident, StockCategoryDef, PREDEFINED_STOCK_CATEGORIES } from '../types';
+import { StockItem, BarSession, Incident } from '../types';
 import {
    Package, Plus, Minus, Search, Wine, Utensils,
    Box, Edit3, Trash2, X, Lock,
-   BadgeEuro, Save, ShoppingBag, User, Timer,
-   BarChart3, TrendingUp, Clock, Zap, AlertTriangle, ArrowRight,
-   MoreHorizontal, ChevronDown, Filter, LayoutGrid, List, ShieldAlert,
-   Flame, Calendar, Activity, Repeat
+   ShoppingBag, User, 
+   BarChart3, TrendingUp, Clock, Zap, AlertTriangle, 
+   MoreHorizontal, ShieldAlert,
+   Camera, Image
 } from 'lucide-react';
 import {
-   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar
+   AreaChart, Area, XAxis, Tooltip, ResponsiveContainer, BarChart, Bar
 } from 'recharts';
 
 interface Props {
    items: StockItem[];
    categories: string[];
-   categoryDefs?: StockCategoryDef[];
    units: string[];
    barSessions?: BarSession[];
    incidents?: Incident[];
@@ -24,14 +23,11 @@ interface Props {
    onAddItem: (item: Omit<StockItem, 'id' | 'lastUpdated'>) => void;
    onUpdateItem: (id: string, updates: Partial<StockItem>) => void;
    onDelete: (id: string) => void;
-   onAddShoppingItems?: (items: { name: string; quantity: number; unit: string; estimatedCost?: number; notes?: string }[]) => void;
-   onAutoExpense?: (expense: { description: string; amount: number; category: string; subCategory?: string }) => void;
-   onAutoIncome?: (income: { description: string; amount: number; category: string; subCategory?: string }) => void;
 }
 
 export const StockControl: React.FC<Props> = ({
-   items, categories, categoryDefs = PREDEFINED_STOCK_CATEGORIES, units, barSessions = [], incidents = [],
-   onUpdateStock, onAddItem, onDelete, onUpdateItem, onAddShoppingItems, onAutoExpense, onAutoIncome
+   items, categories, units, barSessions = [], incidents = [],
+   onUpdateStock, onAddItem, onDelete, onUpdateItem
 }) => {
    const [filterCat, setFilterCat] = useState<string>('ALL');
    const [filterUsage, setFilterUsage] = useState<'ALL' | 'CASAL' | 'VENTA'>('ALL');
@@ -39,41 +35,14 @@ export const StockControl: React.FC<Props> = ({
    const [showAddForm, setShowAddForm] = useState(false);
    const [editingItem, setEditingItem] = useState<StockItem | null>(null);
    const [activeTab, setActiveTab] = useState<'CONFIG' | 'STATS'>('CONFIG');
-   const [viewMode, setViewMode] = useState<'GRID' | 'LIST'>('GRID');
+   const [viewMode, ] = useState<'GRID' | 'LIST'>('GRID');
 
    // Menu contextual para móvil
    const [contextMenu, setContextMenu] = useState<string | null>(null);
-   const [showDraftOrder, setShowDraftOrder] = useState(false);
-   const [draftItems, setDraftItems] = useState<{ id: string; name: string; current: number; min: number; toOrder: number; unit: string; costPerUnit: number; checked: boolean }[]>([]);
-
-   // Estado para el popup de gasto automático
-   const [pendingExpense, setPendingExpense] = useState<{ name: string; qty: number; costPerUnit: number; category: string; subCategory?: string; unit: string } | null>(null);
-   // Estado para el popup de INGRESO automático (devolución)
-   const [pendingIncome, setPendingIncome] = useState<{ name: string; qty: number; costPerUnit: number; category: string; subCategory?: string; unit: string } | null>(null);
-
-   // Estado para el Modal de Trasvase de Stock
-   const [transferSourceItem, setTransferSourceItem] = useState<StockItem | null>(null);
-   const [transferDestId, setTransferDestId] = useState<string>('');
-   const [transferQty, setTransferQty] = useState<number>(1);
 
    const [newItem, setNewItem] = useState<Partial<StockItem>>({
-      name: '', quantity: 0, minStock: 5, unit: units[0] || 'u', category: categories[0] || 'BEBIDAS', subCategory: '', location: 'Almacén', costPerUnit: 0, usageType: 'CASAL', dailyLimit: 0
+      name: '', quantity: 0, minStock: 5, unit: units[0] || 'u', category: categories[0] || 'BEBIDA', location: 'Almacén', costPerUnit: 0, usageType: 'CASAL', dailyLimit: 0
    });
-
-   const activeCategories = useMemo(() => {
-      // Return predefined or custom categories that are active in the config
-      return categoryDefs.filter(c => categories.includes(c.id));
-   }, [categories, categoryDefs]);
-
-   // Helper to format category > subcategory for display
-   const formatCategory = (catId?: string, subId?: string) => {
-      if (!catId) return 'SIN CATEGORÍA';
-      const cat = categoryDefs.find(c => c.id === catId);
-      if (!cat) return catId;
-      if (!subId) return cat.name.toUpperCase();
-      const sub = cat.subcategories?.find(s => s.id === subId);
-      return sub ? `${cat.name.toUpperCase()} > ${sub.name.toUpperCase()}` : cat.name.toUpperCase();
-   };
 
    const filteredItems = useMemo(() => {
       return items.filter(i => {
@@ -158,116 +127,62 @@ export const StockControl: React.FC<Props> = ({
 
    }, [editingItem, barSessions, incidents]);
 
+   // Photo upload helper
+   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, isEdit: boolean = false) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+         const base64 = reader.result as string;
+         if (isEdit && editingItem) {
+            setEditingItem({ ...editingItem, imageUrl: base64 });
+         } else {
+            setNewItem({ ...newItem, imageUrl: base64 });
+         }
+      };
+      reader.readAsDataURL(file);
+   };
+
+   const removePhoto = (isEdit: boolean = false) => {
+      if (isEdit && editingItem) {
+         setEditingItem({ ...editingItem, imageUrl: undefined });
+      } else {
+         setNewItem({ ...newItem, imageUrl: undefined });
+      }
+   };
+
 
    const handleAddManual = () => {
       if (!newItem.name) return;
-      const qty = Number(newItem.quantity);
-      const cost = Number(newItem.costPerUnit) || 0;
       onAddItem({
          name: newItem.name.toUpperCase(),
-         quantity: qty,
+         quantity: Number(newItem.quantity),
          minStock: Number(newItem.minStock),
          unit: newItem.unit || 'u',
-         category: newItem.category || 'BEBIDAS',
-         subCategory: newItem.subCategory || undefined,
+         category: newItem.category || 'BEBIDA',
          location: newItem.location || 'Almacén',
-         costPerUnit: cost,
+         costPerUnit: Number(newItem.costPerUnit) || 0,
          usageType: newItem.usageType as any || 'CASAL',
-         dailyLimit: newItem.usageType === 'CASAL' ? Number(newItem.dailyLimit) : undefined
+         dailyLimit: newItem.usageType === 'CASAL' ? Number(newItem.dailyLimit) : undefined,
+         imageUrl: newItem.imageUrl // ✅ Include photo
       });
-      // Si tiene cantidad y coste, ofrecer crear gasto INMEDIATAMENTE
-      if (qty > 0 && cost > 0 && onAutoExpense) {
-         const total = +(qty * cost).toFixed(2);
-         const itemName = newItem.name.toUpperCase();
-         const itemCat = newItem.category || 'BEBIDAS';
-         const itemSubCat = newItem.subCategory || undefined;
-         const itemUnit = newItem.unit || 'u';
-         // Usando setPendingExpense para el modal bonito
-         setPendingExpense({ name: itemName, qty, costPerUnit: cost, category: itemCat, subCategory: itemSubCat, unit: itemUnit });
-         // Reset del form pero NO cerrar modal de gasto
-         setNewItem({ name: '', quantity: 0, minStock: 5, unit: units[0] || 'u', category: categories[0] || 'BEBIDAS', subCategory: '', location: 'Almacén', costPerUnit: 0, usageType: 'CASAL', dailyLimit: 0 });
-         setShowAddForm(false);
-         return; // No ejecutar los resets de abajo
-      }
-      setNewItem({ name: '', quantity: 0, minStock: 5, unit: units[0] || 'u', category: categories[0] || 'BEBIDAS', subCategory: '', location: 'Almacén', costPerUnit: 0, usageType: 'CASAL', dailyLimit: 0 });
+      setNewItem({ name: '', quantity: 0, minStock: 5, unit: units[0] || 'u', category: categories[0] || 'BEBIDA', location: 'Almacén', costPerUnit: 0, usageType: 'CASAL', dailyLimit: 0 });
       setShowAddForm(false);
    };
 
    const handleSaveEdit = () => {
       if (editingItem) {
-         const originalItem = items.find(i => i.id === editingItem.id);
-         const qtyAdded = originalItem ? editingItem.quantity - originalItem.quantity : 0;
          onUpdateItem(editingItem.id, editingItem);
-         // Si se subió la cantidad y tiene coste, ofrecer crear gasto
-         if (qtyAdded > 0 && editingItem.costPerUnit > 0 && onAutoExpense) {
-            setPendingExpense({ name: editingItem.name, qty: qtyAdded, costPerUnit: editingItem.costPerUnit, category: editingItem.category || 'STOCK', subCategory: editingItem.subCategory || undefined, unit: editingItem.unit });
-         }
-         // Si se REDUJO la cantidad y tiene coste, ofrecer crear INGRESO (devolución)
-         if (qtyAdded < 0 && editingItem.costPerUnit > 0 && onAutoIncome) {
-            setPendingIncome({ name: editingItem.name, qty: Math.abs(qtyAdded), costPerUnit: editingItem.costPerUnit, category: editingItem.category || 'STOCK', subCategory: editingItem.subCategory || undefined, unit: editingItem.unit });
-         }
          setEditingItem(null);
       }
-   };
-
-   // --- TRASVASE DE STOCK ---
-   const handleTransferSubmit = () => {
-      if (!transferSourceItem || !transferDestId || transferQty <= 0) return;
-      if (transferQty > transferSourceItem.quantity) {
-         alert("No hay suficiente stock en el origen para trasladar esa cantidad.");
-         return;
-      }
-
-      const destItem = items.find(i => i.id === transferDestId);
-      if (!destItem) return;
-
-      // 1. Restar al origen
-      onUpdateStock(transferSourceItem.id, transferSourceItem.quantity - transferQty);
-      // 2. Sumar al destino
-      onUpdateStock(destItem.id, destItem.quantity + transferQty);
-
-      // Limpiar modal
-      setTransferSourceItem(null);
-      setTransferDestId('');
-      setTransferQty(1);
-   };
-
-   // --- PEDIDO MÍNIMO ---
-   const lowStockItems = useMemo(() => items.filter(i => i.quantity < i.minStock && i.minStock > 0), [items]);
-
-   const generateDraft = () => {
-      setDraftItems(lowStockItems.map(i => ({
-         id: i.id,
-         name: i.name,
-         current: i.quantity,
-         min: i.minStock,
-         toOrder: i.minStock - i.quantity,
-         unit: i.unit,
-         costPerUnit: i.costPerUnit,
-         checked: true
-      })));
-      setShowDraftOrder(true);
-   };
-
-   const confirmDraft = () => {
-      const selected = draftItems.filter(d => d.checked && d.toOrder > 0);
-      if (selected.length === 0) return;
-      onAddShoppingItems?.(selected.map(d => ({
-         name: d.name,
-         quantity: d.toOrder,
-         unit: d.unit,
-         estimatedCost: +(d.toOrder * d.costPerUnit).toFixed(2),
-         notes: `Pedido mínimo automático (stock: ${d.current}/${d.min})`
-      })));
-      setShowDraftOrder(false);
-      setDraftItems([]);
    };
 
    return (
       <div className="flex flex-col gap-4 md:gap-6 animate-in fade-in duration-500 w-full pb-32">
 
          {/* 1. KPIs HEADER */}
-         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-slate-900 rounded-[32px] p-6 text-white relative overflow-hidden shadow-xl flex flex-col justify-between h-32 md:h-40 group">
                <div className="relative z-10">
                   <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Valor Venta</p>
@@ -292,29 +207,9 @@ export const StockControl: React.FC<Props> = ({
                <User size={100} className="absolute -right-4 -bottom-6 opacity-5 rotate-12 text-orange-600 group-hover:scale-110 transition-transform" />
             </div>
 
-            <div className="bg-gradient-to-br from-emerald-500 to-emerald-700 rounded-[32px] p-6 text-white relative overflow-hidden shadow-xl flex flex-col justify-between h-32 md:h-40 group col-span-2 md:col-span-1">
-               <div className="relative z-10">
-                  <p className="text-[10px] font-black text-emerald-200 uppercase tracking-widest mb-1">Coste Total Inventario</p>
-                  <h3 className="text-3xl md:text-4xl font-black tabular-nums">{items.reduce((acc, i) => acc + (i.quantity * i.costPerUnit), 0).toLocaleString('es-ES', { maximumFractionDigits: 0 })}€</h3>
-               </div>
-               <div className="relative z-10 flex items-center gap-2">
-                  <div className="w-2 h-2 bg-emerald-300 rounded-full animate-pulse"></div>
-                  <span className="text-[10px] font-bold text-emerald-200 uppercase">{items.length} productos</span>
-               </div>
-               <BadgeEuro size={100} className="absolute -right-4 -bottom-6 opacity-10 rotate-12 group-hover:scale-110 transition-transform" />
-            </div>
-
             <button onClick={() => setShowAddForm(true)} className="bg-white border-2 border-slate-200 rounded-[32px] p-6 text-slate-900 shadow-sm flex flex-col items-center justify-center gap-3 active:scale-95 transition-all h-32 md:h-40 hover:border-indigo-300 group">
                <div className="p-3 bg-slate-100 group-hover:bg-indigo-50 group-hover:text-indigo-600 rounded-full transition-colors"><Plus size={32} /></div>
                <span className="font-black uppercase text-xs tracking-widest text-slate-500 group-hover:text-indigo-600">Nuevo Producto</span>
-            </button>
-
-            <button onClick={generateDraft} className={`bg-white border-2 rounded-[32px] p-6 text-slate-900 shadow-sm flex flex-col items-center justify-center gap-3 active:scale-95 transition-all h-32 md:h-40 group ${lowStockItems.length > 0 ? 'border-rose-300 hover:border-rose-500 ring-2 ring-rose-100' : 'border-slate-200 hover:border-slate-300'}`}>
-               <div className={`p-3 rounded-full transition-colors relative ${lowStockItems.length > 0 ? 'bg-rose-100 text-rose-600 group-hover:bg-rose-200' : 'bg-slate-100 text-slate-400'}`}>
-                  <ShoppingBag size={32} />
-                  {lowStockItems.length > 0 && <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white text-[10px] font-black rounded-full flex items-center justify-center animate-pulse">{lowStockItems.length}</span>}
-               </div>
-               <span className={`font-black uppercase text-[10px] tracking-widest ${lowStockItems.length > 0 ? 'text-rose-600' : 'text-slate-400'}`}>Pedido Mínimo</span>
             </button>
          </div>
 
@@ -338,12 +233,9 @@ export const StockControl: React.FC<Props> = ({
 
             {/* Categories Scroll */}
             <div className="flex overflow-x-auto gap-2 pb-1 no-scrollbar px-1">
-               <button onClick={() => setFilterCat('ALL')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap shadow-sm border ${filterCat === 'ALL' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200'}`}>
-                  Todo
-               </button>
-               {activeCategories.map(cat => (
-                  <button key={cat.id} onClick={() => setFilterCat(cat.id)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap shadow-sm border ${filterCat === cat.id ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200'}`}>
-                     {cat.name}
+               {['ALL', ...categories].map(cat => (
+                  <button key={cat} onClick={() => setFilterCat(cat)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap shadow-sm border ${filterCat === cat ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200'}`}>
+                     {cat === 'ALL' ? 'Todo' : cat}
                   </button>
                ))}
             </div>
@@ -372,13 +264,17 @@ export const StockControl: React.FC<Props> = ({
                      {/* CARD HEADER */}
                      <div className="flex justify-between items-start mb-4">
                         <div className="flex items-center gap-3 md:gap-4 overflow-hidden">
-                           <div className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${isOverLimit ? 'bg-rose-500 text-white animate-pulse' : iconBg}`}>
-                              {isOverLimit ? <ShieldAlert size={20} className="md:w-6 md:h-6" /> : item.category?.includes('BEBIDA') ? <Wine size={20} className="md:w-6 md:h-6" /> : <Utensils size={20} className="md:w-6 md:h-6" />}
-                           </div>
+                           {item.imageUrl ? (
+                              <img src={item.imageUrl} alt={item.name} className="w-12 h-12 md:w-14 md:h-14 rounded-2xl object-cover shrink-0 shadow-sm border-2 border-white" />
+                           ) : (
+                              <div className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${isOverLimit ? 'bg-rose-500 text-white animate-pulse' : iconBg}`}>
+                                 {isOverLimit ? <ShieldAlert size={20} className="md:w-6 md:h-6" /> : item.category.includes('BEBIDA') ? <Wine size={20} className="md:w-6 md:h-6" /> : <Utensils size={20} className="md:w-6 md:h-6" />}
+                              </div>
+                           )}
                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-col gap-0.5 mb-1.5 align-start">
-                                 <span className={`text-[8px] font-black uppercase tracking-widest leading-none ${isOverLimit ? 'text-rose-600' : typeColor}`}>{isOverLimit ? 'CUPO AGOTADO' : typeLabel}</span>
-                                 <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-none block">{formatCategory(item.category, item.subCategory)}</span>
+                              <div className="flex items-center gap-2 mb-0.5">
+                                 <span className={`text-[8px] font-black uppercase tracking-widest ${isOverLimit ? 'text-rose-600' : typeColor}`}>{isOverLimit ? 'CUPO AGOTADO' : typeLabel}</span>
+                                 {item.category && <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest hidden md:inline">• {item.category}</span>}
                               </div>
                               <h4 className="font-black text-slate-900 text-base md:text-lg leading-tight truncate uppercase italic">{item.name}</h4>
 
@@ -447,9 +343,6 @@ export const StockControl: React.FC<Props> = ({
                               <span className="text-[10px] font-black text-slate-400 uppercase">Opciones</span>
                               <button onClick={() => setContextMenu(null)}><X size={16} className="text-slate-400" /></button>
                            </div>
-                           <button onClick={() => { setTransferSourceItem(item); setTransferDestId(''); setTransferQty(1); setContextMenu(null); }} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 hover:bg-orange-50 text-slate-600 hover:text-orange-600 font-bold text-xs transition-colors">
-                              <Repeat size={16} /> Traspasar Stock
-                           </button>
                            <button onClick={() => { setEditingItem(item); setActiveTab('STATS'); setContextMenu(null); }} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 font-bold text-xs transition-colors">
                               <BarChart3 size={16} /> Ver Estadísticas
                            </button>
@@ -487,34 +380,13 @@ export const StockControl: React.FC<Props> = ({
                      <input placeholder="Nombre (ej. Coca Cola)" value={newItem.name} onChange={e => setNewItem({ ...newItem, name: e.target.value })} className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold outline-none focus:border-indigo-500 uppercase" />
 
                      <div className="grid grid-cols-2 gap-4">
-                        <div className="col-span-2 md:col-span-1">
-                           <label className="text-[9px] font-bold text-slate-400 uppercase ml-2 mb-1 block">Uso</label>
-                           <select value={newItem.usageType} onChange={e => setNewItem({ ...newItem, usageType: e.target.value as any })} className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-xs uppercase outline-none">
-                              <option value="VENTA">Venta</option>
-                              <option value="CASAL">Casal (Barra Fallera)</option>
-                           </select>
-                        </div>
-                        <div className="col-span-2 md:col-span-1">
-                           <label className="text-[9px] font-bold text-slate-400 uppercase ml-2 mb-1 block">Categoría</label>
-                           <select value={newItem.category} onChange={e => {
-                              setNewItem({ ...newItem, category: e.target.value, subCategory: '' });
-                           }} className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-xs uppercase outline-none">
-                              {activeCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                           </select>
-                        </div>
-
-                        {/* Rendering cascaded subcategory if selected category has them */}
-                        {activeCategories.find(c => c.id === newItem.category)?.subcategories?.length ? (
-                           <div className="col-span-2">
-                              <label className="text-[9px] font-bold text-slate-400 uppercase ml-2 mb-1 block">Subcategoría</label>
-                              <select value={newItem.subCategory || ''} onChange={e => setNewItem({ ...newItem, subCategory: e.target.value })} className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-xs uppercase outline-none">
-                                 <option value="">(Ninguna)</option>
-                                 {activeCategories.find(c => c.id === newItem.category)?.subcategories?.map(s => (
-                                    <option key={s.id} value={s.id}>{s.name}</option>
-                                 ))}
-                              </select>
-                           </div>
-                        ) : null}
+                        <select value={newItem.usageType} onChange={e => setNewItem({ ...newItem, usageType: e.target.value as any })} className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-xs uppercase outline-none">
+                           <option value="VENTA">Venta</option>
+                           <option value="CASAL">Casal (Barra Fallera)</option>
+                        </select>
+                        <select value={newItem.category} onChange={e => setNewItem({ ...newItem, category: e.target.value })} className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-xs uppercase outline-none">
+                           {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
                      </div>
 
                      <div className="grid grid-cols-2 gap-4">
@@ -527,17 +399,6 @@ export const StockControl: React.FC<Props> = ({
                            <select value={newItem.unit} onChange={e => setNewItem({ ...newItem, unit: e.target.value })} className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-xs uppercase outline-none">
                               {units.map(u => <option key={u} value={u}>{u}</option>)}
                            </select>
-                        </div>
-                     </div>
-
-                     <div className="grid grid-cols-2 gap-4">
-                        <div>
-                           <label className="text-[9px] font-bold text-emerald-500 uppercase ml-2 flex items-center gap-1">💰 Coste/ud (€)</label>
-                           <input type="number" step="0.01" placeholder="0.00" value={newItem.costPerUnit || ''} onChange={e => setNewItem({ ...newItem, costPerUnit: Number(e.target.value) })} className="w-full p-4 bg-emerald-50 border-2 border-emerald-200 rounded-2xl font-black text-center text-lg outline-none focus:border-emerald-500 text-emerald-700" />
-                        </div>
-                        <div>
-                           <label className="text-[9px] font-bold text-slate-400 uppercase ml-2">Stock Mínimo</label>
-                           <input type="number" value={newItem.minStock} onChange={e => setNewItem({ ...newItem, minStock: Number(e.target.value) })} className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-center text-lg outline-none focus:border-indigo-500" />
                         </div>
                      </div>
 
@@ -555,6 +416,32 @@ export const StockControl: React.FC<Props> = ({
                            <p className="text-[9px] text-orange-400 mt-2 leading-tight">Si pones 0, será barra libre. Si pones un número, la app avisará al superar ese consumo diario.</p>
                         </div>
                      )}
+
+                     {/* Photo Upload */}
+                     <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 flex items-center gap-2">
+                           <Camera size={10} /> Foto del Producto (Opcional)
+                        </label>
+                        {newItem.imageUrl ? (
+                           <div className="relative">
+                              <img src={newItem.imageUrl} alt="Preview" className="w-full h-40 object-cover rounded-2xl border-2 border-slate-100" />
+                              <button
+                                 onClick={() => removePhoto(false)}
+                                 type="button"
+                                 className="absolute top-2 right-2 p-2 bg-rose-500 text-white rounded-full shadow-lg hover:bg-rose-600 active:scale-95 transition-all"
+                              >
+                                 <X size={16} />
+                              </button>
+                           </div>
+                        ) : (
+                           <label className="w-full h-40 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/30 transition-all">
+                              <Image size={32} className="text-slate-300 mb-2" />
+                              <span className="text-xs font-bold text-slate-400">Toca para subir foto</span>
+                              <span className="text-[10px] text-slate-300 mt-1">JPG, PNG o WebP</span>
+                              <input type="file" accept="image/*" onChange={(e) => handlePhotoUpload(e, false)} className="hidden" />
+                           </label>
+                        )}
+                     </div>
                   </div>
                   <button onClick={handleAddManual} className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl mb-4">Guardar</button>
                </div>
@@ -599,23 +486,6 @@ export const StockControl: React.FC<Props> = ({
                                  </div>
                               </div>
                               <div className="space-y-2">
-                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Categoría Principal</label>
-                                 <select value={editingItem.category} onChange={e => setEditingItem({ ...editingItem, category: e.target.value, subCategory: '' })} className="w-full p-4 bg-white border-2 border-slate-100 rounded-2xl font-bold text-xs uppercase outline-none">
-                                    {activeCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                 </select>
-                              </div>
-                              {activeCategories.find(c => c.id === editingItem.category)?.subcategories?.length ? (
-                                 <div className="space-y-2 md:col-span-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Subcategoría</label>
-                                    <select value={editingItem.subCategory || ''} onChange={e => setEditingItem({ ...editingItem, subCategory: e.target.value })} className="w-full p-4 bg-white border-2 border-slate-100 rounded-2xl font-bold text-xs uppercase outline-none">
-                                       <option value="">(Ninguna)</option>
-                                       {activeCategories.find(c => c.id === editingItem.category)?.subcategories?.map(s => (
-                                          <option key={s.id} value={s.id}>{s.name}</option>
-                                       ))}
-                                    </select>
-                                 </div>
-                              ) : null}
-                              <div className="space-y-2">
                                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Coste Unitario (€)</label>
                                  <input type="number" step="0.01" value={editingItem.costPerUnit} onChange={e => setEditingItem({ ...editingItem, costPerUnit: Number(e.target.value) })} className="w-full p-4 bg-white border-2 border-slate-100 rounded-2xl font-bold outline-none focus:border-indigo-500" />
                               </div>
@@ -634,27 +504,35 @@ export const StockControl: React.FC<Props> = ({
                                        onChange={e => setEditingItem({ ...editingItem, dailyLimit: Number(e.target.value) })}
                                        className="w-full p-4 bg-white border-2 border-orange-200 rounded-2xl font-black text-xl outline-none focus:border-orange-400 text-orange-900"
                                     />
-                                    <p className="text-[10px] text-orange-400 ml-2">Unidades permitidas por día. 0 para desactivar.</p>
+                                    <p className="text-[9px] text-orange-400 leading-tight">0 = Barra libre. Número = Cupo máximo permitido.</p>
                                  </div>
                               )}
+                           </div>
 
-                              {/* IMAGE URL */}
-                              <div className="md:col-span-2 space-y-2 bg-indigo-50 p-4 rounded-3xl border border-indigo-100">
-                                 <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Edit3 size={12} /> Foto del Producto (URL)</label>
-                                 <input
-                                    type="url"
-                                    placeholder="https://ejemplo.com/foto-producto.jpg"
-                                    value={editingItem.imageUrl || ''}
-                                    onChange={e => setEditingItem({ ...editingItem, imageUrl: e.target.value })}
-                                    className="w-full p-4 bg-white border-2 border-indigo-200 rounded-2xl font-bold text-sm outline-none focus:border-indigo-400 text-indigo-900"
-                                 />
-                                 {editingItem.imageUrl && (
-                                    <div className="mt-2 flex items-center gap-3">
-                                       <img src={editingItem.imageUrl} alt="Preview" className="w-16 h-16 rounded-xl object-cover border-2 border-indigo-200 shadow-sm" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-                                       <p className="text-[10px] text-indigo-400">Vista previa — esta foto se verá en el modo kiosko</p>
-                                    </div>
-                                 )}
-                              </div>
+                           {/* Photo Upload in Edit Form */}
+                           <div className="space-y-2">
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 flex items-center gap-2">
+                                 <Camera size={12} /> Foto del Producto
+                              </label>
+                              {editingItem.imageUrl ? (
+                                 <div className="relative">
+                                    <img src={editingItem.imageUrl} alt={editingItem.name} className="w-full h-48 object-cover rounded-3xl border-2 border-slate-100" />
+                                    <button
+                                       onClick={() => removePhoto(true)}
+                                       type="button"
+                                       className="absolute top-3 right-3 p-3 bg-rose-500 text-white rounded-full shadow-lg hover:bg-rose-600 active:scale-95 transition-all"
+                                    >
+                                       <X size={20} />
+                                    </button>
+                                 </div>
+                              ) : (
+                                 <label className="w-full h-48 border-2 border-dashed border-slate-200 rounded-3xl flex flex-col items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/30 transition-all">
+                                    <Image size={48} className="text-slate-300 mb-3" />
+                                    <span className="text-sm font-bold text-slate-400">Toca para añadir foto</span>
+                                    <span className="text-xs text-slate-300 mt-1">Recomendado: 512x512px</span>
+                                    <input type="file" accept="image/*" onChange={(e) => handlePhotoUpload(e, true)} className="hidden" />
+                                 </label>
+                              )}
                            </div>
                         </div>
                      )}
@@ -732,280 +610,6 @@ export const StockControl: React.FC<Props> = ({
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 20px; }
         .snap-x > div { scroll-snap-align: center; }
       `}</style>
-
-         {/* --- DRAFT ORDER MODAL --- */}
-         {showDraftOrder && (
-            <div className="fixed inset-0 z-[200] bg-slate-950/80 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-4">
-               <div className="bg-white p-6 md:p-8 rounded-t-[40px] md:rounded-[40px] w-full max-w-lg shadow-2xl animate-in slide-in-from-bottom md:zoom-in-95 border-t-4 md:border-4 border-rose-500 max-h-[90vh] overflow-y-auto">
-                  <div className="flex justify-between items-center mb-6">
-                     <div>
-                        <h3 className="text-xl font-black uppercase italic tracking-tighter">Pedido Mínimo</h3>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">{draftItems.filter(d => d.checked).length} productos seleccionados</p>
-                     </div>
-                     <button onClick={() => setShowDraftOrder(false)} className="p-2 bg-slate-100 rounded-full"><X size={20} /></button>
-                  </div>
-
-                  {draftItems.length === 0 ? (
-                     <div className="py-12 text-center">
-                        <Package size={48} className="mx-auto text-emerald-300 mb-4" />
-                        <p className="font-black text-emerald-600 uppercase text-sm">¡Todo el stock está OK!</p>
-                        <p className="text-xs text-slate-400 mt-2">Ningún producto por debajo de su mínimo</p>
-                     </div>
-                  ) : (
-                     <div className="space-y-3 mb-6">
-                        {draftItems.map((d, idx) => (
-                           <div key={d.id} className={`p-4 rounded-2xl border-2 transition-all ${d.checked ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-slate-100 opacity-50'}`}>
-                              <div className="flex items-center gap-3">
-                                 <button onClick={() => setDraftItems(prev => prev.map((p, i) => i === idx ? { ...p, checked: !p.checked } : p))} className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 transition-colors ${d.checked ? 'bg-rose-500 border-rose-500 text-white' : 'border-slate-300'}`}>
-                                    {d.checked && <Save size={12} />}
-                                 </button>
-                                 <div className="flex-1 min-w-0">
-                                    <p className="font-black text-sm uppercase truncate">{d.name}</p>
-                                    <p className="text-[10px] font-bold text-slate-400">Stock: {d.current}/{d.min} {d.unit} · Coste: {(d.toOrder * d.costPerUnit).toFixed(2)}€</p>
-                                 </div>
-                                 <div className="flex items-center gap-1 shrink-0">
-                                    <button onClick={() => setDraftItems(prev => prev.map((p, i) => i === idx ? { ...p, toOrder: Math.max(1, p.toOrder - 1) } : p))} className="w-8 h-8 bg-white border rounded-lg flex items-center justify-center">
-                                       <Minus size={14} />
-                                    </button>
-                                    <span className="w-10 text-center font-black text-lg">{d.toOrder}</span>
-                                    <button onClick={() => setDraftItems(prev => prev.map((p, i) => i === idx ? { ...p, toOrder: p.toOrder + 1 } : p))} className="w-8 h-8 bg-rose-500 text-white rounded-lg flex items-center justify-center">
-                                       <Plus size={14} />
-                                    </button>
-                                 </div>
-                              </div>
-                           </div>
-                        ))}
-                     </div>
-                  )}
-
-                  {draftItems.length > 0 && (
-                     <div className="space-y-3">
-                        <div className="bg-slate-50 p-4 rounded-2xl flex justify-between items-center">
-                           <span className="text-xs font-black text-slate-500 uppercase">Coste estimado total</span>
-                           <span className="text-xl font-black text-rose-600">{draftItems.filter(d => d.checked).reduce((acc, d) => acc + d.toOrder * d.costPerUnit, 0).toFixed(2)}€</span>
-                        </div>
-                        <button onClick={confirmDraft} disabled={draftItems.filter(d => d.checked).length === 0} className="w-full py-5 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-300 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl transition-colors">
-                           Añadir {draftItems.filter(d => d.checked).length} productos a la Lista de Compras
-                        </button>
-                     </div>
-                  )}
-               </div>
-            </div>
-         )}
-
-         {/* MODAL: GASTO AUTOMÁTICO POR COMPRA DE STOCK */}
-         {pendingExpense && (
-            <div className="fixed inset-0 z-[500] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-               <div className="bg-white w-full max-w-sm rounded-[32px] p-6 shadow-2xl">
-                  <div className="text-center mb-4">
-                     <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                        <BadgeEuro size={28} className="text-emerald-600" />
-                     </div>
-                     <h3 className="text-lg font-black text-slate-900 uppercase">¿Registrar gasto?</h3>
-                     <p className="text-xs text-slate-500 mt-1">Has añadido stock con coste. ¿Descontar del presupuesto?</p>
-                  </div>
-
-                  <div className="bg-slate-50 rounded-2xl p-4 space-y-2 mb-4">
-                     <div className="flex justify-between text-sm">
-                        <span className="text-slate-500">Producto</span>
-                        <span className="font-black text-slate-900">{pendingExpense.name}</span>
-                     </div>
-                     <div className="flex justify-between text-sm">
-                        <span className="text-slate-500">Cantidad</span>
-                        <span className="font-bold">{pendingExpense.qty} {pendingExpense.unit}</span>
-                     </div>
-                     <div className="flex justify-between text-sm">
-                        <span className="text-slate-500">Coste unitario</span>
-                        <span className="font-bold">{pendingExpense.costPerUnit.toFixed(2)}€</span>
-                     </div>
-                     <div className="border-t border-slate-200 pt-2 flex justify-between">
-                        <span className="text-sm font-black text-slate-700 uppercase">Total</span>
-                        <span className="text-2xl font-black text-rose-600">{(pendingExpense.qty * pendingExpense.costPerUnit).toFixed(2)}€</span>
-                     </div>
-                  </div>
-
-                  <div className="space-y-2">
-                     <button
-                        onClick={() => {
-                           onAutoExpense?.({
-                              description: `Compra stock: ${pendingExpense.name} x${pendingExpense.qty}`,
-                              amount: +(pendingExpense.qty * pendingExpense.costPerUnit).toFixed(2),
-                              category: pendingExpense.category,
-                              subCategory: pendingExpense.subCategory
-                           });
-                           setPendingExpense(null);
-                        }}
-                        className="w-full py-4 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl font-black uppercase text-sm transition-colors"
-                     >
-                        ✅ Sí, registrar GASTO
-                     </button>
-                     <button
-                        onClick={() => setPendingExpense(null)}
-                        className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-2xl font-bold text-xs uppercase transition-colors"
-                     >
-                        No, solo actualizar stock
-                     </button>
-                  </div>
-               </div>
-            </div>
-         )}
-
-         {/* MODAL: INGRESO AUTOMÁTICO POR DEVOLUCIÓN DE STOCK */}
-         {pendingIncome && (
-            <div className="fixed inset-0 z-[500] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-               <div className="bg-white w-full max-w-sm rounded-[32px] p-6 shadow-[0_20px_60px_-15px_rgba(16,185,129,0.3)]">
-                  <div className="text-center mb-4">
-                     <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                        <BadgeEuro size={28} className="text-emerald-600" />
-                     </div>
-                     <h3 className="text-lg font-black text-slate-900 uppercase">¿Devolución?</h3>
-                     <p className="text-xs text-slate-500 mt-1">Has restado stock que tiene coste. ¿Lo has devuelto al proveedor para recuperar dinero?</p>
-                  </div>
-
-                  <div className="bg-emerald-50 rounded-2xl p-4 space-y-2 mb-4 border border-emerald-100">
-                     <div className="flex justify-between text-sm">
-                        <span className="text-slate-500">Producto</span>
-                        <span className="font-black text-slate-900">{pendingIncome.name}</span>
-                     </div>
-                     <div className="flex justify-between text-sm">
-                        <span className="text-slate-500">Ud. Restadas</span>
-                        <span className="font-bold">{pendingIncome.qty} {pendingIncome.unit}</span>
-                     </div>
-                     <div className="flex justify-between text-sm">
-                        <span className="text-slate-500">Coste unitario</span>
-                        <span className="font-bold">{pendingIncome.costPerUnit.toFixed(2)}€</span>
-                     </div>
-                     <div className="border-t border-emerald-200 pt-2 flex justify-between">
-                        <span className="text-sm font-black text-emerald-800 uppercase">Total a Ingresar</span>
-                        <span className="text-2xl font-black text-emerald-600">{(pendingIncome.qty * pendingIncome.costPerUnit).toFixed(2)}€</span>
-                     </div>
-                  </div>
-
-                  <div className="space-y-2">
-                     <button
-                        onClick={() => {
-                           onAutoIncome?.({
-                              description: `Devolución Proveedor: ${pendingIncome.name} x${pendingIncome.qty}`,
-                              amount: +(pendingIncome.qty * pendingIncome.costPerUnit).toFixed(2),
-                              category: pendingIncome.category,
-                              subCategory: pendingIncome.subCategory
-                           });
-                           setPendingIncome(null);
-                        }}
-                        className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black uppercase text-sm transition-colors shadow-lg shadow-emerald-600/20"
-                     >
-                        ✅ SÍ, REGISTRAR INGRESO
-                     </button>
-                     <button
-                        onClick={() => setPendingIncome(null)}
-                        className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-2xl font-bold text-xs uppercase transition-colors"
-                     >
-                        No, rotura / consumo
-                     </button>
-                  </div>
-               </div>
-            </div>
-         )}
-
-         {/* --- MODAL TRASVASE STOCK --- */}
-         {transferSourceItem && (
-            <div className="fixed inset-0 z-[500] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-               <div className="bg-white w-full max-w-md rounded-[32px] p-6 shadow-2xl border-4 border-orange-500">
-                  <div className="flex justify-between items-center mb-6">
-                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600">
-                           <Repeat size={20} />
-                        </div>
-                        <div>
-                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Movimiento</p>
-                           <h3 className="text-xl font-black text-slate-900 uppercase italic">Traspasar Stock</h3>
-                        </div>
-                     </div>
-                     <button onClick={() => setTransferSourceItem(null)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition-colors"><X size={20} /></button>
-                  </div>
-
-                  <div className="space-y-4">
-                     {/* ORIGEN */}
-                     <div className="bg-slate-50 rounded-2xl p-4 border-2 border-slate-100 flex justify-between items-center">
-                        <div>
-                           <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Extraer de:</p>
-                           <p className="font-black text-slate-900 uppercase truncate max-w-[200px]">{transferSourceItem.name}</p>
-                           <p className="text-xs font-bold text-slate-500">{transferSourceItem.usageType}</p>
-                        </div>
-                        <div className="text-right">
-                           <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Disponible</p>
-                           <p className="font-black text-xl text-slate-900">{transferSourceItem.quantity} <span className="text-xs text-slate-400">{transferSourceItem.unit}</span></p>
-                        </div>
-                     </div>
-
-                     <div className="flex justify-center -my-2 relative z-10">
-                        <div className="bg-white p-1 rounded-full"><div className="bg-orange-100 text-orange-600 p-1.5 rounded-full"><ArrowRight size={16} className="rotate-90" /></div></div>
-                     </div>
-
-                     {/* DESTINO */}
-                     <div className="bg-indigo-50 rounded-2xl p-4 border-2 border-indigo-100">
-                        <p className="text-[9px] font-black text-indigo-400 uppercase mb-2">Añadir a:</p>
-                        <select
-                           value={transferDestId}
-                           onChange={e => setTransferDestId(e.target.value)}
-                           className="w-full p-3 bg-white border-2 border-indigo-200 rounded-xl font-bold text-sm outline-none focus:border-indigo-400 text-slate-800"
-                        >
-                           <option value="" disabled>Selecciona el producto de destino...</option>
-                           {/* Priority: Same name, different usage */}
-                           {items.filter(i => i.id !== transferSourceItem.id && i.name.toUpperCase() === transferSourceItem.name.toUpperCase()).length > 0 && (
-                              <optgroup label="Coincidencias de nombre">
-                                 {items.filter(i => i.id !== transferSourceItem.id && i.name.toUpperCase() === transferSourceItem.name.toUpperCase()).map(i => (
-                                    <option key={i.id} value={i.id}>{i.name} ({i.usageType}) - Stock: {i.quantity}</option>
-                                 ))}
-                              </optgroup>
-                           )}
-                           <optgroup label="Todos los productos">
-                              {items.filter(i => i.id !== transferSourceItem.id).sort((a, b) => a.name.localeCompare(b.name)).map(i => (
-                                 <option key={i.id} value={i.id}>{i.name} ({i.usageType}) - Stock: {i.quantity}</option>
-                              ))}
-                           </optgroup>
-                        </select>
-                     </div>
-
-                     {/* CANTIDAD */}
-                     <div className="pt-2">
-                        <p className="text-[9px] font-black text-slate-400 uppercase mb-2 ml-2">¿Cuántas {transferSourceItem.unit} quieres mover?</p>
-                        <div className="flex items-center gap-4 bg-white border-2 border-slate-200 p-2 rounded-2xl">
-                           <button
-                              onClick={() => setTransferQty(Math.max(1, transferQty - 1))}
-                              className="w-12 h-12 bg-slate-100 hover:bg-slate-200 rounded-xl flex items-center justify-center text-slate-600 transition-colors"
-                           >
-                              <Minus />
-                           </button>
-                           <input
-                              type="number"
-                              value={transferQty}
-                              onChange={e => setTransferQty(Math.max(1, Math.min(transferSourceItem.quantity, Number(e.target.value))))}
-                              className="flex-1 bg-transparent text-center font-black text-3xl outline-none"
-                              min="1"
-                              max={transferSourceItem.quantity}
-                           />
-                           <button
-                              onClick={() => setTransferQty(Math.min(transferSourceItem.quantity, transferQty + 1))}
-                              className="w-12 h-12 bg-slate-100 hover:bg-slate-200 rounded-xl flex items-center justify-center text-slate-600 transition-colors"
-                           >
-                              <Plus />
-                           </button>
-                        </div>
-                     </div>
-                  </div>
-
-                  <button
-                     onClick={handleTransferSubmit}
-                     disabled={!transferDestId || transferQty <= 0}
-                     className="w-full mt-6 py-4 bg-orange-600 disabled:bg-slate-300 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all"
-                  >
-                     Confirmar Traspaso
-                  </button>
-               </div>
-            </div>
-         )}
       </div>
    );
 };
-

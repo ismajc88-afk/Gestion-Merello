@@ -13,7 +13,7 @@ interface FinanceProps {
   onAddShoppingItem: (item: Omit<ShoppingItem, 'id' | 'checked'>) => void;
 }
 
-export const FinanceModules: React.FC<FinanceProps> = ({ transactions, budgetLimit, budgetLines, onAddTransaction, onUpdateBudget, onAddShoppingItem }) => {
+export const FinanceModules: React.FC<FinanceProps> = ({ transactions, budgetLimit, budgetLines, onAddTransaction, onAddShoppingItem }) => {
   const toast = useToast();
   const [activeTab, setActiveTab] = useState<'overview' | 'entry' | 'audit' | 'budget' | 'stock' | 'purchase'>('overview');
   const [desc, setDesc] = useState('');
@@ -162,7 +162,7 @@ export const FinanceModules: React.FC<FinanceProps> = ({ transactions, budgetLim
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie data={chartData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                  {chartData.map((entry, index) => (
+                  {chartData.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>

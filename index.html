@@ -7,29 +7,91 @@
     content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
   <title>Merello Planner 2026</title>
 
-  <!-- SEO -->
-  <meta name="description" content="Sistema de gestión integral para la Falla Eduardo Merello 2026" />
-
-  <!-- PWA / Android -->
-  <meta name="theme-color" content="#0f172a" />
+  <!-- Configuración PWA / Android -->
+  <meta name="theme-color" content="#09090b" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Merello Planner" />
+  <meta name="apple-mobile-web-app-title" content="Merello" />
 
   <link rel="manifest" href="/manifest.json" />
   <link rel="icon" type="image/png" href="/escudo-merello.png" />
   <link rel="apple-touch-icon" href="/escudo-merello.png" />
 
-  <!-- Google Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap"
-    rel="stylesheet" />
+  <!-- iOS Splash Screen -->
+  <link rel="apple-touch-startup-image" href="/icon-512.png" />
+
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js')
+          .then(reg => console.log('✅ Service Worker registrado:', reg.scope))
+          .catch(err => console.error('❌ Error Service Worker:', err));
+      });
+    }
+  </script>
+
+  <!-- Environment variables loaded by Vite -->
+  <link rel="stylesheet" href="/index.css">
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.3.1",
+    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+    "react-dom": "https://esm.sh/react-dom@18.3.1",
+    "@google/genai": "https://esm.sh/@google/genai@0.1.1",
+    "lucide-react": "https://esm.sh/lucide-react@0.344.0",
+    "recharts": "https://esm.sh/recharts@2.12.0?external=react,react-dom",
+    "trystero": "https://esm.sh/trystero@0.19.0",
+    "vite": "https://esm.sh/vite@5.1.4",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@4.2.1",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react-onesignal": "https://esm.sh/react-onesignal@^3.4.6"
+  }
+}
+</script>
 </head>
 
 <body>
   <div id="root"></div>
+  <div id="startup-watchdog"
+    style="display:none; position:fixed; inset:0; z-index:99999; background:#000; color:#ff0000; padding:2rem; font-family:monospace; flex-direction:column; align-items:center; justify-content:center;">
+    <h1 style="font-size:2rem; margin-bottom:1rem;">⚠️ SISTEMA BLOQUEADO</h1>
+    <p style="color:#ffffff; margin-bottom:2rem; text-align:center;">La aplicación no responde. Pulsa el botón para
+      reiniciar los datos.</p>
+    <button onclick="hardReset()"
+      style="background:#ff0000; color:white; border:none; padding:1rem 2rem; font-size:1.5rem; font-weight:bold; cursor:pointer; border-radius:1rem;">🧨
+      REINICIO DE FÁBRICA</button>
+  </div>
+
+  <script>
+    function hardReset() {
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(registrations => {
+            for (let registration of registrations) registration.unregister();
+          });
+        }
+        alert('Datos borrados. Recargando...');
+        window.location.reload();
+      } catch (e) {
+        alert('Error borrando: ' + e);
+      }
+    }
+
+    setTimeout(() => {
+      const root = document.getElementById('root');
+      const hasContent = root && root.innerText.trim().length > 0;
+      // If root is empty or contains specific panic text
+      if (!hasContent || document.body.innerText.includes('CRITICAL_RENDER_ERROR')) {
+        document.getElementById('startup-watchdog').style.display = 'flex';
+      }
+    }, 5000); // 5 seconds timeout
+  </script>
   <script type="module" src="/index.tsx"></script>
 </body>
 

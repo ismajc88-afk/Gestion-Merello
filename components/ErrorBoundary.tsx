@@ -1,5 +1,5 @@
 
-import React, { Component, ErrorInfo, ReactNode } from "react";
+import { Component, ErrorInfo, ReactNode } from "react";
 import { AlertTriangle, RefreshCw, Trash2, Home } from "lucide-react";
 
 interface ErrorBoundaryProps {
@@ -63,16 +63,17 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               Se ha producido un error inesperado. Tus datos están a salvo.
             </p>
 
-            {/* Error details */}
-            <details className="mb-6 text-left">
-              <summary className="text-xs font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:text-slate-400 transition-colors">
-                Detalles técnicos
-              </summary>
-              <pre className="mt-2 p-3 bg-slate-950 rounded-xl text-[10px] text-rose-400 font-mono overflow-auto max-h-32 border border-slate-800">
+            {/* Error details - ALWAYS VISIBLE NOW */}
+            <div className="mb-6 text-left w-full">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                MENSAJE DE ERROR (Copia esto):
+              </p>
+              <pre className="p-4 bg-slate-950 rounded-xl text-xs text-rose-400 font-mono overflow-auto max-h-60 border-2 border-rose-500/30 whitespace-pre-wrap break-all select-all">
                 {this.state.error?.message || 'Error desconocido'}
-                {this.state.error?.stack && `\n\n${this.state.error.stack.split('\n').slice(0, 5).join('\n')}`}
+                {'\n\nStack:\n'}
+                {this.state.error?.stack || 'No stack trace'}
               </pre>
-            </details>
+            </div>
 
             {/* Actions */}
             <div className="space-y-3">

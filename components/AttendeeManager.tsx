@@ -2,10 +2,8 @@
 import React, { useState, useMemo } from 'react';
 import { Member, Task, Shift, MealEvent } from '../types';
 import {
-   Users, Search, Plus, Trash2, X, HeartPulse, UserPlus,
-   ChevronRight, CheckCircle2, Phone, FileText, Activity,
-   Moon, Sun, Sunset, Fingerprint, Award, Briefcase, Beer,
-   ShieldCheck, ArrowRightCircle, QrCode, Layout
+   Users, Search, Trash2, X, HeartPulse, UserPlus, ChevronRight, CheckCircle2, Phone, FileText, Activity,
+   ShieldCheck, QrCode, Layout, Sun, Sunset, Moon, Briefcase, Beer
 } from 'lucide-react';
 
 interface Props {
@@ -23,6 +21,7 @@ export const AttendeeManager: React.FC<Props> = ({ members, tasks, shifts, mealE
    const [showAddForm, setShowAddForm] = useState(false);
    const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
    const [newMember, setNewMember] = useState({ name: '', role: 'Fallero', allergies: '', skills: '', emergency: '' });
+   // pinManagement removed
 
    // --- LOGIC: INTELLIGENCE CORE ---
    const memberIntel = useMemo(() => {
@@ -53,9 +52,9 @@ export const AttendeeManager: React.FC<Props> = ({ members, tasks, shifts, mealE
    }, [members, tasks, shifts, mealEvents]);
 
    const filteredMembers = members.filter(m =>
-      m.name?.toLowerCase().includes(filter.toLowerCase()) ||
-      m.role?.toLowerCase().includes(filter.toLowerCase()) ||
-      m.skills?.some(s => s?.toLowerCase().includes(filter.toLowerCase()))
+      m.name.toLowerCase().includes(filter.toLowerCase()) ||
+      m.role.toLowerCase().includes(filter.toLowerCase()) ||
+      m.skills?.some(s => s.toLowerCase().includes(filter.toLowerCase()))
    );
 
    const selectedMember = members.find(m => m.id === selectedMemberId);
@@ -85,6 +84,8 @@ export const AttendeeManager: React.FC<Props> = ({ members, tasks, shifts, mealE
       const current = m.preferences || { morning: true, afternoon: true, night: true };
       onUpdateMember(memberId, { preferences: { ...current, [time]: !current[time] } });
    };
+
+   // PIN Management removed as it now belongs to roles in config
 
    return (
       <div className="flex flex-col h-full gap-4 md:gap-6 animate-in fade-in duration-500 pb-20">

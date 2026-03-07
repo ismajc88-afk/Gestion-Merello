@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reparación Merello</title>
+    <style>
+        body {
+            background: #111;
+            color: #fff;
+            font-family: system-ui, sans-serif;
+            display: flex;
+            flex-col;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            text-align: center;
+        }
+
+        button {
+            background: #E11D48;
+            color: white;
+            border: none;
+            padding: 20px 40px;
+            font-size: 20px;
+            border-radius: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(225, 29, 72, 0.4);
+        }
+
+        h1 {
+            color: #E11D48;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>HERRAMIENTA DE REPARACIÓN</h1>
+    <p>Si la app no carga, pulsa el botón rojo.</p>
+    <button onclick="wipe()">🧨 BORRAR TODO Y REPARAR</button>
+    <div id="status" style="margin-top: 20px; color: #888;"></div>
+
+    <script>
+        function wipe() {
+            try {
+                localStorage.clear();
+                sessionStorage.clear();
+
+                // Clear Service Workers
+                if (navigator.serviceWorker) {
+                    navigator.serviceWorker.getRegistrations().then(function (registrations) {
+                        for (let registration of registrations) {
+                            registration.unregister();
+                        }
+                    });
+                }
+
+                document.getElementById('status').innerText = "✅ SISTEMA LIMPIO. REINICIANDO...";
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 1500);
+            } catch (e) {
+                alert("Error: " + e);
+            }
+        }
+    </script>
+</body>
+
+</html>

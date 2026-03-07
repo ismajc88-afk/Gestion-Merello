@@ -25,8 +25,8 @@
     "strictPropertyInitialization": true,
     "noImplicitThis": true,
     "alwaysStrict": true,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "forceConsistentCasingInFileNames": true
@@ -37,13 +37,10 @@
   ],
   "exclude": [
     "node_modules",
-    "solitary-planetarium",
-    "kinetic-cassini",
-    "kinetic-einstein",
-    "midnight-stellar",
-    "prime-disk",
     "aphelion-copernicus",
-    "static-stellar",
-    "dist"
+    "kinetic-cassini",
+    "solitary-planetarium",
+    "__tests__",
+    "vitest.config.ts"
   ]
 }
