@@ -1,46 +1,167 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { RouteStop } from '../../types';
-import { Map, MapPin, Plus, Trash2, Clock, Navigation, Download } from 'lucide-react';
+import { Navigation, Plus, Trash2, Clock, Download, AlertTriangle, ChevronUp, ChevronDown } from 'lucide-react';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import { useToast } from '../../hooks/useToast';
+
+// Fix for default Leaflet icons in React
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
+// Custom Icons per Role
+const createCustomIcon = (color: string) => {
+    return new L.DivIcon({
+        className: 'custom-leaflet-icon',
+        html: `<div style="background-color: ${color}; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+    });
+};
+
+const ROLE_COLORS: Record<string, string> = {
+    FMI: '#e879f9', // pink-400
+    PI: '#60a5fa',  // blue-400
+    FM: '#fb7185',  // rose-400
+    P: '#818cf8',   // indigo-400
+    BANDA: '#fbbf24', // amber-400
+    CASAL: '#475569', // slate-600
+    OTHER: '#94a3b8'  // slate-400
+};
 
 const STOP_DURATION_MINUTES = 10;
+const PUERTO_SAGUNTO_CENTER: [number, number] = [39.6644, -0.2312];
 
-const ROLE_COLORS = {
-    FMI: 'bg-pink-100 text-pink-700 border-pink-200',
-    PI: 'bg-blue-100 text-blue-700 border-blue-200',
-    FM: 'bg-rose-100 text-rose-700 border-rose-200',
-    P: 'bg-indigo-100 text-indigo-700 border-indigo-200',
-    BANDA: 'bg-amber-100 text-amber-700 border-amber-200',
-    CASAL: 'bg-slate-100 text-slate-700 border-slate-200',
-    OTHER: 'bg-gray-100 text-gray-700 border-gray-200',
-};
+interface RouteData {
+    geometry: [number, number][]; // Lat, Lng
+    durationSeconds: number;
+    distanceMeters: number;
+}
 
-const ROLE_LABELS = {
-    FMI: 'Fallera Mayor Infantil',
-    PI: 'Presidente Infantil',
-    FM: 'Fallera Mayor',
-    P: 'Presidente',
-    BANDA: 'Banda de Música',
-    CASAL: 'Casal Fallero',
-    OTHER: 'Otra Parada'
-};
+function BoundsFitter({ positions }: { positions: [number, number][] }) {
+    const map = useMap();
+    useEffect(() => {
+        if (positions.length > 0) {
+            const bounds = L.latLngBounds(positions);
+            map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+        }
+    }, [positions, map]);
+    return null;
+}
 
 export function PasacallesRoute() {
+    const toast = useToast();
     const [stops, setStops] = useState<RouteStop[]>([
-        { id: '1', name: 'Casal', address: 'Calle Principal, 1', role: 'CASAL' },
+        { id: '1', name: 'Casal Merello', address: 'Puerto de Sagunto', role: 'CASAL', lat: 39.6644, lng: -0.2312 }
     ]);
     const [newStopName, setNewStopName] = useState('');
     const [newStopAddress, setNewStopAddress] = useState('');
     const [newStopRole, setNewStopRole] = useState<RouteStop['role']>('OTHER');
     const [startTime, setStartTime] = useState('17:00');
 
-    const addStop = () => {
+    const [routeSegments, setRouteSegments] = useState<Record<string, RouteData>>({});
+    const [isCalculating, setIsCalculating] = useState(false);
+
+    // 1. Geocodificación: Texto a Coordenadas (Usando Nominatim)
+    const fetchCoordinates = async (address: string): Promise<[number, number] | null> => {
+        try {
+            // Add 'Puerto de Sagunto, Valencia' to improve accuracy if not present
+            const searchQuery = address.toLowerCase().includes('puerto') || address.toLowerCase().includes('sagunt')
+                ? address
+                : `${address}, Puerto de Sagunto, Valencia`;
+
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}`);
+            const data = await res.json();
+            if (data && data.length > 0) {
+                return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+            }
+            return null;
+        } catch {
+            return null;
+        }
+    };
+
+    // 2. Routing: De A a B caminando (Usando OSRM)
+    const fetchRouteSegment = async (start: [number, number], end: [number, number]): Promise<RouteData | null> => {
+        try {
+            // OSRM requires format: lon,lat
+            const res = await fetch(`https://router.project-osrm.org/route/v1/foot/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`);
+            const data = await res.json();
+            if (data.code === 'Ok' && data.routes.length > 0) {
+                const route = data.routes[0];
+                // OSRM returns geometry coordinates as [lng, lat], Leaflet wants [lat, lng]
+                const geometry = route.geometry.coordinates.map((coord: [number, number]) => [coord[1], coord[0]] as [number, number]);
+                return {
+                    geometry,
+                    durationSeconds: route.duration,
+                    distanceMeters: route.distance
+                };
+            }
+            return null;
+        } catch {
+            return null;
+        }
+    };
+
+    const calculateFullRoute = async (currentStops: RouteStop[]) => {
+        setIsCalculating(true);
+        const newSegments: Record<string, RouteData> = {};
+
+        for (let i = 0; i < currentStops.length - 1; i++) {
+            const start = currentStops[i];
+            const end = currentStops[i + 1];
+            if (start.lat && start.lng && end.lat && end.lng) {
+                const key = `${start.id}-${end.id}`;
+                // Check if we already cached this segment route
+                if (routeSegments[key]) {
+                    newSegments[key] = routeSegments[key];
+                    continue;
+                }
+                // Fetch from real API
+                const segment = await fetchRouteSegment([start.lat, start.lng], [end.lat, end.lng]);
+                if (segment) {
+                    newSegments[key] = segment;
+                }
+            }
+        }
+        setRouteSegments(newSegments);
+        setIsCalculating(false);
+    };
+
+    // Recalculate routes when stops change order or are added/removed
+    useEffect(() => {
+        const validStops = stops.filter(s => s.lat && s.lng);
+        if (validStops.length > 1) {
+            calculateFullRoute(stops);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [stops]);
+
+    const addStop = async () => {
         if (!newStopName || !newStopAddress) return;
+
+        toast.info('Buscando dirección en el mapa...');
+        const coords = await fetchCoordinates(newStopAddress);
+
+        if (!coords) {
+            toast.error('No se pudo encontrar la dirección. Usando ubicación aproximada.');
+        } else {
+            toast.success('Dirección encontrada');
+        }
+
         const newStop: RouteStop = {
             id: Date.now().toString(),
             name: newStopName,
             address: newStopAddress,
-            role: newStopRole
+            role: newStopRole,
+            lat: coords?.[0] || (PUERTO_SAGUNTO_CENTER[0] + (Math.random() * 0.01 - 0.005)), // Fake jitter if API fails
+            lng: coords?.[1] || (PUERTO_SAGUNTO_CENTER[1] + (Math.random() * 0.01 - 0.005))
         };
+
         setStops([...stops, newStop]);
         setNewStopName('');
         setNewStopAddress('');
@@ -63,7 +184,7 @@ export function PasacallesRoute() {
         }
     };
 
-    // Simulate time calculation based on order
+    // Integrate calculated Real Routes into Times
     const calculatedStops = useMemo(() => {
         let currentMinutes = 0;
         if (startTime) {
@@ -71,183 +192,191 @@ export function PasacallesRoute() {
             currentMinutes = h * 60 + m;
         }
 
-        return stops.map((stop, index) => {
-            const stopTime = `${String(Math.floor(currentMinutes / 60)).padStart(2, '0')}:${String(currentMinutes % 60).padStart(2, '0')}`;
+        let routeDistanceTotal = 0;
 
-            // Add walking time (simulated 15 mins) + stop time for the next address
+        const mapped = stops.map((stop, index) => {
+            const stopTime = `${String(Math.floor(currentMinutes / 60) % 24).padStart(2, '0')}:${String(Math.floor(currentMinutes % 60)).padStart(2, '0')}`;
+
+            let walkMins = 0;
+            let walkDist = 0;
+
             if (index < stops.length - 1) {
-                // Dummy simulated time between stops: 12 minutes walk + 10 mins photo/protocol
-                currentMinutes += 12 + STOP_DURATION_MINUTES;
+                const nextStop = stops[index + 1];
+                const segmentKey = `${stop.id}-${nextStop.id}`;
+                const segment = routeSegments[segmentKey];
+
+                if (segment) {
+                    // Exact time from OSRM + Protocol time
+                    walkMins = Math.ceil(segment.durationSeconds / 60);
+                    walkDist = segment.distanceMeters;
+                    routeDistanceTotal += walkDist;
+                } else {
+                    walkMins = 15; // Fallback
+                }
+                currentMinutes += walkMins + STOP_DURATION_MINUTES;
             }
 
             return {
                 ...stop,
-                timeExp: stopTime
+                timeExp: stopTime,
+                walkMinsToNext: walkMins,
+                distToNext: walkDist
             };
         });
-    }, [stops, startTime]);
+
+        return { stops: mapped, totalDistance: routeDistanceTotal };
+    }, [stops, startTime, routeSegments]);
+
+    // Flatten all route segment geometries for drawing the main polyline
+    const allRouteCoords = useMemo(() => {
+        let coords: [number, number][] = [];
+        for (let i = 0; i < stops.length - 1; i++) {
+            const key = `${stops[i].id}-${stops[i + 1].id}`;
+            if (routeSegments[key]) {
+                coords = [...coords, ...routeSegments[key].geometry];
+            }
+        }
+        return coords;
+    }, [stops, routeSegments]);
+
+    const allMarkerPositions = stops.filter(s => s.lat && s.lng).map(s => [s.lat, s.lng] as [number, number]);
 
     return (
-        <div className="bg-white rounded-[32px] border border-slate-200 overflow-hidden shadow-sm animate-in fade-in zoom-in-95 duration-300 flex flex-col h-full">
+        <div className="bg-white rounded-[32px] border border-slate-200 overflow-hidden shadow-sm flex flex-col h-full animate-in fade-in duration-300">
+
             {/* HEADER */}
-            <div className="bg-gradient-to-br from-orange-400 to-rose-500 p-6 text-white relative overflow-hidden shrink-0">
-                <Map className="absolute -right-4 -top-4 w-32 h-32 opacity-20" />
-                <h3 className="text-2xl font-black uppercase mb-2 relative z-10 flex items-center gap-2">
-                    <Navigation /> Organizador de Recogidas
-                </h3>
-                <p className="text-orange-100 font-medium relative z-10 text-sm max-w-[80%]">
-                    Añade las direcciones de los Representantes y la Banda, ordénalos y calcula a qué hora aproximada llegaréis a cada casa.
-                </p>
+            <div className="bg-slate-900 p-6 text-white shrink-0 flex items-center justify-between">
+                <div>
+                    <h3 className="text-2xl font-black uppercase mb-1 flex items-center gap-2">
+                        <Navigation className="text-blue-400" /> Creador de Rutas Geográficas
+                    </h3>
+                    <p className="text-slate-400 font-medium text-sm flex items-center gap-2">
+                        Conectado a OpenStreetMap para distancias reales
+                        {isCalculating && <span className="text-amber-400 flex items-center gap-1"><Clock size={12} className="animate-spin" /> Calculando tiempos...</span>}
+                    </p>
+                </div>
+                <div className="text-right hidden md:block">
+                    <p className="text-xl font-black text-blue-400">
+                        {(calculatedStops.totalDistance / 1000).toFixed(2)} km
+                    </p>
+                    <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">Distancia Total Andando</p>
+                </div>
             </div>
 
-            <div className="p-6 md:p-8 flex-1 flex flex-col md:flex-row gap-8 overflow-hidden h-full">
+            <div className="p-4 md:p-6 flex-1 flex flex-col xl:flex-row gap-6 overflow-hidden h-full">
 
-                {/* ADD STOP FORM */}
-                <div className="w-full md:w-1/3 space-y-4 shrink-0 overflow-y-auto pr-2 custom-scrollbar">
-                    <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
-                        <h4 className="font-black text-slate-800 text-sm uppercase tracking-widest mb-4">Añadir Parada</h4>
+                {/* PANEL IZQ: FORMULARIO Y LISTA */}
+                <div className="w-full xl:w-[450px] flex flex-col gap-4 shrink-0 overflow-y-auto pr-2 custom-scrollbar">
 
-                        <div className="space-y-3">
-                            <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">¿A quién recogemos?</label>
-                                <select
-                                    value={newStopRole}
-                                    onChange={(e) => setNewStopRole(e.target.value as any)}
-                                    className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-sm focus:border-rose-400 focus:ring-1 focus:ring-rose-400 outline-none transition-all"
-                                >
-                                    {Object.entries(ROLE_LABELS).map(([val, label]) => (
-                                        <option key={val} value={val}>{label}</option>
-                                    ))}
-                                </select>
+                    <div className="bg-slate-50 p-4 rounded-3xl border border-slate-200">
+                        <div className="flex items-center gap-2 mb-4">
+                            <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-auto p-2 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 outline-none" />
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Hora de Salida</span>
+                        </div>
+
+                        <div className="space-y-2">
+                            <input type="text" placeholder="📝 Nombre (Ej: FMI Laura)" value={newStopName} onChange={(e) => setNewStopName(e.target.value)} className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none" />
+                            <div className="flex gap-2">
+                                <input type="text" placeholder="📍 Dirección Completa (Ej: Calle Mayor 12)" value={newStopAddress} onChange={(e) => setNewStopAddress(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addStop()} className="flex-1 p-3 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none" />
+                                <button onClick={addStop} disabled={!newStopName || !newStopAddress} className="px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded-xl transition-colors shrink-0">
+                                    <Plus size={20} />
+                                </button>
                             </div>
-
-                            <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Nombre / Detalle</label>
-                                <input
-                                    type="text"
-                                    placeholder="Ej: Fallera Mayor Laura..."
-                                    value={newStopName}
-                                    onChange={(e) => setNewStopName(e.target.value)}
-                                    className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-rose-400 focus:ring-1 focus:ring-rose-400 transition-all placeholder:font-normal"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Dirección / Calle</label>
-                                <input
-                                    type="text"
-                                    placeholder="Ej: Av. Camp de Morvedre, 24"
-                                    value={newStopAddress}
-                                    onChange={(e) => setNewStopAddress(e.target.value)}
-                                    className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-rose-400 focus:ring-1 focus:ring-rose-400 transition-all placeholder:font-normal"
-                                />
-                            </div>
-
-                            <button
-                                onClick={addStop}
-                                disabled={!newStopName || !newStopAddress}
-                                className="w-full py-3 mt-2 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 transition-colors"
-                            >
-                                <Plus size={16} /> Añadir a la ruta
-                            </button>
                         </div>
                     </div>
 
-                    <div className="bg-orange-50 p-5 rounded-2xl border border-orange-100 mt-4">
-                        <h4 className="font-black text-orange-800 text-sm uppercase tracking-widest mb-3 flex items-center gap-2">
-                            <Clock size={16} /> Configurar Horario
-                        </h4>
-                        <label className="text-[10px] font-bold text-orange-600/70 uppercase mb-1 block">Hora de salida desde Casal</label>
-                        <input
-                            type="time"
-                            value={startTime}
-                            onChange={(e) => setStartTime(e.target.value)}
-                            className="w-full p-3 bg-white border-2 border-orange-200 rounded-xl font-black text-orange-600 text-lg text-center outline-none focus:border-orange-400 transition-all"
-                        />
-                        <p className="text-[10px] text-orange-600/70 font-semibold mt-3 text-center">
-                            El tiempo entre paradas se estima en +/- 20 mins (camino + fotos).
-                        </p>
-                    </div>
-                </div>
+                    <div className="flex-1 overflow-y-auto space-y-2 relative pb-20">
+                        <div className="absolute left-6 top-6 bottom-6 w-0.5 bg-slate-200 z-0"></div>
 
-                {/* ROUTE LIST */}
-                <div className="flex-1 bg-slate-50 border border-slate-100 rounded-3xl p-2 md:p-6 overflow-hidden flex flex-col">
-                    <div className="flex items-center justify-between mb-4 px-2">
-                        <h4 className="font-black text-slate-800 flex items-center gap-2">
-                            <span className="w-2 h-2 bg-rose-500 rounded-full"></span>
-                            Itinerario Previsto ({calculatedStops.length} paradas)
-                        </h4>
-                        <button className="text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors">
-                            <Download size={14} /> Exportar PDF
-                        </button>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-2 relative">
-                        {/* Timeline line */}
-                        <div className="absolute left-6 top-4 bottom-4 w-0.5 bg-slate-200 z-0 hidden md:block"></div>
-
-                        {calculatedStops.map((stop, index) => (
-                            <div key={stop.id} className="bg-white border text-left border-slate-200 rounded-2xl p-4 flex items-center gap-4 group relative z-10 hover:border-rose-300 transition-colors shadow-sm">
-
-                                {/* Reorder handles */}
-                                <div className="flex flex-col gap-1 shrink-0">
-                                    <button
-                                        onClick={() => moveStop(index, 'UP')}
-                                        disabled={index === 0}
-                                        className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-700 disabled:opacity-30"
-                                    >
-                                        <ChevronUp size={16} />
-                                    </button>
-                                    <button
-                                        onClick={() => moveStop(index, 'DOWN')}
-                                        disabled={index === stops.length - 1}
-                                        className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-700 disabled:opacity-30"
-                                    >
-                                        <ChevronDown size={16} />
-                                    </button>
-                                </div>
-
-                                {/* Time & Pin */}
-                                <div className="shrink-0 flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-slate-100 border-2 border-white shadow-sm flex items-center justify-center relative">
-                                        <MapPin size={18} className="text-slate-400" />
-                                        {index === 0 && <span className="absolute -top-1 -right-1 flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span></span>}
+                        {calculatedStops.stops.map((stop, index) => (
+                            <div key={stop.id} className="relative z-10">
+                                <div className="bg-white border text-left border-slate-200 rounded-2xl p-3 flex shadow-sm group">
+                                    <div className="w-10 flex flex-col items-center gap-1 shrink-0 pt-1">
+                                        <button onClick={() => moveStop(index, 'UP')} disabled={index === 0} className="text-slate-300 hover:text-slate-600 disabled:opacity-0"><ChevronUp size={16} /></button>
+                                        <div className="w-4 h-4 rounded-full border-2 border-white shadow flex items-center justify-center text-[10px] font-bold text-white z-10" style={{ backgroundColor: ROLE_COLORS[stop.role || 'OTHER'] }}></div>
+                                        <button onClick={() => moveStop(index, 'DOWN')} disabled={index === stops.length - 1} className="text-slate-300 hover:text-slate-600 disabled:opacity-0"><ChevronDown size={16} /></button>
                                     </div>
-                                    <div className="bg-slate-800 text-white px-3 py-1.5 rounded-lg text-sm font-black tracking-wider w-20 text-center">
-                                        {stop.timeExp}
+
+                                    <div className="flex-1 min-w-0 pr-2">
+                                        <div className="flex items-center justify-between mb-1">
+                                            <span className="bg-slate-800 text-white px-2 py-0.5 rounded text-xs font-black">{stop.timeExp}</span>
+                                            <button onClick={() => removeStop(stop.id)} className="text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14} /></button>
+                                        </div>
+                                        <h5 className="font-bold text-slate-900 text-sm truncate">{stop.name}</h5>
+                                        <p className="text-xs text-slate-500 truncate mt-0.5">{stop.address}</p>
+
+                                        {!stop.lat && (
+                                            <p className="text-[10px] text-amber-500 font-bold mt-1 flex items-center gap-1"><AlertTriangle size={10} /> Sin coordenadas. Revisa la dirección.</p>
+                                        )}
                                     </div>
                                 </div>
 
-                                {/* Info */}
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border ${ROLE_COLORS[stop.role || 'OTHER']}`}>
-                                            {ROLE_LABELS[stop.role || 'OTHER']}
-                                        </span>
+                                {/* Segment Details */}
+                                {index < calculatedStops.stops.length - 1 && (
+                                    <div className="pl-12 py-2 flex items-center gap-2 opacity-60">
+                                        <div className="flex items-center justify-center p-1.5 bg-slate-100 rounded-lg text-slate-500">
+                                            <Navigation size={12} />
+                                        </div>
+                                        <p className="text-[10px] font-bold text-slate-500">
+                                            {stop.walkMinsToNext!} min andando (+10m parada) • {(stop.distToNext! / 1000).toFixed(1)} km
+                                        </p>
                                     </div>
-                                    <h5 className="font-bold text-slate-900 truncate">{stop.name}</h5>
-                                    <p className="text-xs text-slate-500 truncate font-medium flex items-center gap-1 mt-0.5">
-                                        <Navigation size={10} /> {stop.address}
-                                    </p>
-                                </div>
-
-                                {/* Delete */}
-                                <button
-                                    onClick={() => removeStop(stop.id)}
-                                    className="w-10 h-10 shrink-0 flex items-center justify-center rounded-xl text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-colors opacity-0 group-hover:opacity-100"
-                                >
-                                    <Trash2 size={18} />
-                                </button>
+                                )}
                             </div>
                         ))}
+                    </div>
 
-                        {calculatedStops.length === 0 && (
-                            <div className="text-center py-12">
-                                <Navigation className="w-12 h-12 text-slate-200 mx-auto mb-3" />
-                                <p className="text-slate-500 font-bold">No hay paradas en la ruta.</p>
-                                <p className="text-sm text-slate-400 mt-1">Añade los representantes en el panel izquierdo.</p>
-                            </div>
+                </div>
+
+                {/* PANEL DERECHO: MAPA INTERACTIVO LEAFLET */}
+                <div className="flex-1 bg-slate-100 rounded-[32px] overflow-hidden relative border border-slate-200 z-0 h-[400px] xl:h-auto">
+                    <MapContainer
+                        center={PUERTO_SAGUNTO_CENTER}
+                        zoom={14}
+                        scrollWheelZoom={true}
+                        className="w-full h-full z-0"
+                        zoomControl={false}
+                    >
+                        <TileLayer
+                            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                        />
+
+                        {allMarkerPositions.length > 0 && <BoundsFitter positions={allMarkerPositions} />}
+
+                        {/* Draw connecting lines */}
+                        {allRouteCoords.length > 0 && (
+                            <Polyline
+                                positions={allRouteCoords}
+                                pathOptions={{ color: '#2563eb', weight: 4, opacity: 0.7, dashArray: '8, 8' }}
+                            />
                         )}
+
+                        {/* Draw stop pins */}
+                        {calculatedStops.stops.map((stop, i) =>
+                            stop.lat && stop.lng ? (
+                                <Marker
+                                    key={stop.id}
+                                    position={[stop.lat, stop.lng]}
+                                    icon={createCustomIcon(ROLE_COLORS[stop.role || 'OTHER'])}
+                                >
+                                    <Popup className="custom-popup">
+                                        <div className="text-center p-1">
+                                            <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Parada {i + 1} • {stop.timeExp}</p>
+                                            <p className="font-bold text-slate-900 border-b border-slate-100 pb-2 mb-2">{stop.name}</p>
+                                            <p className="text-xs text-slate-600">{stop.address}</p>
+                                        </div>
+                                    </Popup>
+                                </Marker>
+                            ) : null
+                        )}
+
+                    </MapContainer>
+
+                    <div className="absolute top-4 right-4 z-[400]">
+                        <button className="bg-white/90 backdrop-blur-sm px-4 py-2 rounded-xl text-xs font-black text-slate-700 shadow flex items-center gap-2 hover:bg-white">
+                            <Download size={14} /> Exportar Ruta
+                        </button>
                     </div>
                 </div>
 
@@ -255,6 +384,3 @@ export function PasacallesRoute() {
         </div>
     );
 }
-
-function ChevronUp(props: any) { return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m18 15-6-6-6 6" /></svg>; }
-function ChevronDown(props: any) { return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m6 9 6 6 6-6" /></svg>; }

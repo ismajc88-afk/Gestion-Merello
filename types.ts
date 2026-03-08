@@ -3,6 +3,8 @@ export interface RouteStop {
   id: string;
   name: string;
   address: string;
+  lat?: number;
+  lng?: number;
   timeExp?: string;
   role: 'FMI' | 'PI' | 'FM' | 'P' | 'BANDA' | 'CASAL' | 'OTHER';
 }
