@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { RouteStop } from '../../types';
-import { Navigation, Plus, Trash2, Clock, Download, AlertTriangle, ChevronUp, ChevronDown } from 'lucide-react';
+import { Navigation, Plus, Trash2, Clock, AlertTriangle, ChevronUp, ChevronDown, Wand2, Share2 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { useToast } from '../../hooks/useToast';
@@ -33,7 +33,6 @@ const ROLE_COLORS: Record<string, string> = {
     OTHER: '#94a3b8'  // slate-400
 };
 
-const STOP_DURATION_MINUTES = 10;
 const PUERTO_SAGUNTO_CENTER: [number, number] = [39.6644, -0.2312];
 
 interface RouteData {
@@ -53,14 +52,31 @@ function BoundsFitter({ positions }: { positions: [number, number][] }) {
     return null;
 }
 
+// Haversine formula to approximate direct distance in meters between two lat/lng points
+function getHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+    const R = 6371e3; // metres
+    const φ1 = lat1 * Math.PI / 180; // φ, λ in radians
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+        Math.cos(φ1) * Math.cos(φ2) *
+        Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c; // in metres
+}
+
 export function PasacallesRoute() {
     const toast = useToast();
     const [stops, setStops] = useState<RouteStop[]>([
-        { id: '1', name: 'Casal Merello', address: 'Puerto de Sagunto', role: 'CASAL', lat: 39.6644, lng: -0.2312 }
+        { id: '1', name: 'Casal Merello', address: 'Puerto de Sagunto', role: 'CASAL', lat: 39.6644, lng: -0.2312, durationMins: 10 }
     ]);
     const [newStopName, setNewStopName] = useState('');
     const [newStopAddress, setNewStopAddress] = useState('');
     const [newStopRole, setNewStopRole] = useState<RouteStop['role']>('OTHER');
+    const [newStopDuration, setNewStopDuration] = useState(10);
     const [startTime, setStartTime] = useState('17:00');
 
     const [routeSegments, setRouteSegments] = useState<Record<string, RouteData>>({});
@@ -158,6 +174,7 @@ export function PasacallesRoute() {
             name: newStopName,
             address: newStopAddress,
             role: newStopRole,
+            durationMins: newStopDuration,
             lat: coords?.[0] || (PUERTO_SAGUNTO_CENTER[0] + (Math.random() * 0.01 - 0.005)), // Fake jitter if API fails
             lng: coords?.[1] || (PUERTO_SAGUNTO_CENTER[1] + (Math.random() * 0.01 - 0.005))
         };
@@ -166,10 +183,16 @@ export function PasacallesRoute() {
         setNewStopName('');
         setNewStopAddress('');
         setNewStopRole('OTHER');
+        setNewStopDuration(10);
     };
 
     const removeStop = (id: string) => {
         setStops(stops.filter(s => s.id !== id));
+    };
+
+    const updateStopDuration = (id: string, mins: number) => {
+        if (mins < 0) return;
+        setStops(stops.map(s => s.id === id ? { ...s, durationMins: mins } : s));
     };
 
     const moveStop = (index: number, direction: 'UP' | 'DOWN') => {
@@ -182,6 +205,56 @@ export function PasacallesRoute() {
             [newStops[index + 1], newStops[index]] = [newStops[index], newStops[index + 1]];
             setStops(newStops);
         }
+    };
+
+    // TSP Optimizer using Nearest Neighbor heuristic (Haversine)
+    const optimizeRoute = () => {
+        if (stops.length <= 2) {
+            toast.info("Añade más paradas para poder optimitzar la ruta.");
+            return;
+        }
+
+        toast.info('Optimizando orden de la ruta...');
+        const validStops = stops.filter(s => s.lat && s.lng);
+        const unmappedStops = stops.filter(s => !s.lat || !s.lng);
+
+        if (validStops.length === 0) return;
+
+        // Keep CASAL or the first item fixed as starting point
+        const startStop = validStops[0];
+        let unvisited = validStops.slice(1);
+        const optimizedPath: RouteStop[] = [startStop];
+
+        let currentStop = startStop;
+
+        while (unvisited.length > 0) {
+            let nearestDist = Infinity;
+            let nearestIdx = -1;
+
+            for (let i = 0; i < unvisited.length; i++) {
+                const candidate = unvisited[i];
+                if (currentStop.lat && currentStop.lng && candidate.lat && candidate.lng) {
+                    const dist = getHaversineDistance(currentStop.lat, currentStop.lng, candidate.lat, candidate.lng);
+                    if (dist < nearestDist) {
+                        nearestDist = dist;
+                        nearestIdx = i;
+                    }
+                }
+            }
+
+            if (nearestIdx !== -1) {
+                currentStop = unvisited[nearestIdx];
+                optimizedPath.push(currentStop);
+                unvisited.splice(nearestIdx, 1);
+            } else {
+                // Fallback if missing coords
+                optimizedPath.push(unvisited[0]);
+                unvisited.splice(0, 1);
+            }
+        }
+
+        setStops([...optimizedPath, ...unmappedStops]);
+        toast.success("Ruta optimizada minimizando distancias.");
     };
 
     // Integrate calculated Real Routes into Times
@@ -213,7 +286,8 @@ export function PasacallesRoute() {
                 } else {
                     walkMins = 15; // Fallback
                 }
-                currentMinutes += walkMins + STOP_DURATION_MINUTES;
+                const duration = stop.durationMins || 10;
+                currentMinutes += walkMins + duration;
             }
 
             return {
@@ -226,6 +300,27 @@ export function PasacallesRoute() {
 
         return { stops: mapped, totalDistance: routeDistanceTotal };
     }, [stops, startTime, routeSegments]);
+
+    // Export Ruta to WhatsApp
+    const exportToWhatsApp = () => {
+        if (calculatedStops.stops.length === 0) return;
+
+        let str = `*🎵 RUTA PASACALLES FALLERO 🎵*\n`;
+        str += `📍 Salida oficial: ${startTime}\n`;
+        str += `🚶‍♂️ Distancia total a pie: ${(calculatedStops.totalDistance / 1000).toFixed(2)} km\n\n`;
+
+        calculatedStops.stops.forEach((stop, index) => {
+            str += `🕒 *${stop.timeExp}* - ${stop.name}\n`;
+            str += `🏠 ${stop.address}\n`;
+            if (index < calculatedStops.stops.length - 1) {
+                str += `     ⬇️ (A pie: ${stop.walkMinsToNext!} min / ${(stop.distToNext! / 1000).toFixed(1)}km. Parada: ${stop.durationMins || 10}m)\n`;
+            }
+        });
+
+        const encodedUri = encodeURIComponent(str);
+        window.open(`https://wa.me/?text=${encodedUri}`, '_blank');
+        toast.success("Abriendo WhatsApp con la ruta lista para enviar.");
+    };
 
     // Flatten all route segment geometries for drawing the main polyline
     const allRouteCoords = useMemo(() => {
@@ -248,18 +343,25 @@ export function PasacallesRoute() {
             <div className="bg-slate-900 p-6 text-white shrink-0 flex items-center justify-between">
                 <div>
                     <h3 className="text-2xl font-black uppercase mb-1 flex items-center gap-2">
-                        <Navigation className="text-blue-400" /> Creador de Rutas Geográficas
+                        <Navigation className="text-blue-400" /> Creador de Rutas Avanzado
                     </h3>
-                    <p className="text-slate-400 font-medium text-sm flex items-center gap-2">
-                        Conectado a OpenStreetMap para distancias reales
-                        {isCalculating && <span className="text-amber-400 flex items-center gap-1"><Clock size={12} className="animate-spin" /> Calculando tiempos...</span>}
-                    </p>
+                    <div className="flex items-center gap-4">
+                        <p className="text-slate-400 font-medium text-sm flex items-center gap-2">
+                            Conectado a OpenStreetMap
+                            {isCalculating && <span className="text-amber-400 flex items-center gap-1"><Clock size={12} className="animate-spin" /> Mapeando...</span>}
+                        </p>
+                    </div>
                 </div>
-                <div className="text-right hidden md:block">
-                    <p className="text-xl font-black text-blue-400">
-                        {(calculatedStops.totalDistance / 1000).toFixed(2)} km
-                    </p>
-                    <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">Distancia Total Andando</p>
+                <div className="flex items-center gap-4">
+                    <div className="text-right hidden md:block border-r border-slate-700 pr-6">
+                        <p className="text-xl font-black text-blue-400">
+                            {(calculatedStops.totalDistance / 1000).toFixed(2)} km
+                        </p>
+                        <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">Distancia Caminando</p>
+                    </div>
+                    <button onClick={exportToWhatsApp} className="p-3 bg-green-600 hover:bg-green-500 rounded-xl transition-colors text-white shadow-lg flex flex-col items-center justify-center shrink-0">
+                        <Share2 size={24} />
+                    </button>
                 </div>
             </div>
 
@@ -268,39 +370,55 @@ export function PasacallesRoute() {
                 {/* PANEL IZQ: FORMULARIO Y LISTA */}
                 <div className="w-full xl:w-[450px] flex flex-col gap-4 shrink-0 overflow-y-auto pr-2 custom-scrollbar">
 
-                    <div className="bg-slate-50 p-4 rounded-3xl border border-slate-200">
-                        <div className="flex items-center gap-2 mb-4">
-                            <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-auto p-2 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 outline-none" />
+                    <div className="bg-slate-50 p-4 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden">
+                        <div className="absolute -right-10 -top-10 text-slate-200 pointer-events-none opacity-20">
+                            <Navigation size={120} />
+                        </div>
+                        <div className="flex items-center gap-2 mb-4 relative z-10">
+                            <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-[110px] p-2 bg-white border border-slate-200 rounded-xl font-black text-lg text-slate-700 outline-none text-center shadow-sm" />
                             <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Hora de Salida</span>
                         </div>
 
-                        <div className="space-y-2">
-                            <input type="text" placeholder="📝 Nombre (Ej: FMI Laura)" value={newStopName} onChange={(e) => setNewStopName(e.target.value)} className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none" />
-                            <div className="flex gap-2">
-                                <input type="text" placeholder="📍 Dirección Completa (Ej: Calle Mayor 12)" value={newStopAddress} onChange={(e) => setNewStopAddress(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addStop()} className="flex-1 p-3 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none" />
-                                <button onClick={addStop} disabled={!newStopName || !newStopAddress} className="px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded-xl transition-colors shrink-0">
-                                    <Plus size={20} />
+                        <div className="space-y-3 relative z-10">
+                            <input type="text" placeholder="📝 Nombre (Ej: FMI Laura)" value={newStopName} onChange={(e) => setNewStopName(e.target.value)} className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none shadow-sm" />
+                            <input type="text" placeholder="📍 Dirección Completa (Ej: Calle Mayor 12)" value={newStopAddress} onChange={(e) => setNewStopAddress(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addStop()} className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none shadow-sm" />
+
+                            <div className="flex items-center gap-2">
+                                <div className="flex-1 flex items-center bg-white border border-slate-200 rounded-xl px-3 outline-none shadow-sm focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                                    <Clock size={16} className="text-slate-400" />
+                                    <input type="number" min="0" value={newStopDuration} onChange={(e) => setNewStopDuration(Number(e.target.value))} className="w-full p-3 bg-transparent font-bold text-sm outline-none ml-2" placeholder="Minutos" />
+                                    <span className="text-xs font-bold text-slate-400">MIN</span>
+                                </div>
+                                <button onClick={addStop} disabled={!newStopName || !newStopAddress} className="h-full px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-bold rounded-xl transition-colors shrink-0 shadow flex items-center gap-2">
+                                    Añadir <Plus size={18} />
                                 </button>
                             </div>
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto space-y-2 relative pb-20">
+                    <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-bold text-sm text-slate-500 uppercase tracking-wider">Itinerario Programado</h4>
+                        <button onClick={optimizeRoute} className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold text-xs rounded-lg transition-colors border border-indigo-200">
+                            <Wand2 size={14} /> Optimizar Ruta
+                        </button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto space-y-2 relative pb-20 mt-2">
                         <div className="absolute left-6 top-6 bottom-6 w-0.5 bg-slate-200 z-0"></div>
 
                         {calculatedStops.stops.map((stop, index) => (
                             <div key={stop.id} className="relative z-10">
-                                <div className="bg-white border text-left border-slate-200 rounded-2xl p-3 flex shadow-sm group">
+                                <div className="bg-white border text-left border-slate-200 rounded-2xl p-3 flex shadow-sm group hover:border-blue-200 transition-colors">
                                     <div className="w-10 flex flex-col items-center gap-1 shrink-0 pt-1">
-                                        <button onClick={() => moveStop(index, 'UP')} disabled={index === 0} className="text-slate-300 hover:text-slate-600 disabled:opacity-0"><ChevronUp size={16} /></button>
+                                        <button onClick={() => moveStop(index, 'UP')} disabled={index === 0} className="text-slate-300 hover:text-blue-500 disabled:opacity-0"><ChevronUp size={16} /></button>
                                         <div className="w-4 h-4 rounded-full border-2 border-white shadow flex items-center justify-center text-[10px] font-bold text-white z-10" style={{ backgroundColor: ROLE_COLORS[stop.role || 'OTHER'] }}></div>
-                                        <button onClick={() => moveStop(index, 'DOWN')} disabled={index === stops.length - 1} className="text-slate-300 hover:text-slate-600 disabled:opacity-0"><ChevronDown size={16} /></button>
+                                        <button onClick={() => moveStop(index, 'DOWN')} disabled={index === stops.length - 1} className="text-slate-300 hover:text-blue-500 disabled:opacity-0"><ChevronDown size={16} /></button>
                                     </div>
 
                                     <div className="flex-1 min-w-0 pr-2">
                                         <div className="flex items-center justify-between mb-1">
-                                            <span className="bg-slate-800 text-white px-2 py-0.5 rounded text-xs font-black">{stop.timeExp}</span>
-                                            <button onClick={() => removeStop(stop.id)} className="text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14} /></button>
+                                            <span className="bg-slate-800 text-white px-2 py-0.5 rounded text-xs font-black shadow-sm">{stop.timeExp}</span>
+                                            <button onClick={() => removeStop(stop.id)} className="text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-rose-50 rounded"><Trash2 size={16} /></button>
                                         </div>
                                         <h5 className="font-bold text-slate-900 text-sm truncate">{stop.name}</h5>
                                         <p className="text-xs text-slate-500 truncate mt-0.5">{stop.address}</p>
@@ -308,17 +426,29 @@ export function PasacallesRoute() {
                                         {!stop.lat && (
                                             <p className="text-[10px] text-amber-500 font-bold mt-1 flex items-center gap-1"><AlertTriangle size={10} /> Sin coordenadas. Revisa la dirección.</p>
                                         )}
+
+                                        <div className="mt-2 flex items-center gap-2 border-t border-slate-100 pt-2">
+                                            <span className="text-[10px] font-bold text-slate-400 uppercase">Tiempo Parada:</span>
+                                            <input
+                                                type="number"
+                                                value={stop.durationMins || 0}
+                                                onChange={e => updateStopDuration(stop.id, Number(e.target.value))}
+                                                className="w-16 p-1 bg-slate-50 border border-slate-200 rounded text-xs font-bold font-mono text-center text-indigo-700 outline-none focus:border-indigo-400"
+                                            />
+                                            <span className="text-[10px] font-bold text-slate-400">MIN</span>
+                                        </div>
+
                                     </div>
                                 </div>
 
                                 {/* Segment Details */}
                                 {index < calculatedStops.stops.length - 1 && (
                                     <div className="pl-12 py-2 flex items-center gap-2 opacity-60">
-                                        <div className="flex items-center justify-center p-1.5 bg-slate-100 rounded-lg text-slate-500">
+                                        <div className="flex items-center justify-center p-1.5 bg-slate-100 rounded-lg text-slate-500 shadow-inner">
                                             <Navigation size={12} />
                                         </div>
                                         <p className="text-[10px] font-bold text-slate-500">
-                                            {stop.walkMinsToNext!} min andando (+10m parada) • {(stop.distToNext! / 1000).toFixed(1)} km
+                                            {stop.walkMinsToNext!} min andando • {(stop.distToNext! / 1000).toFixed(1)} km
                                         </p>
                                     </div>
                                 )}
@@ -329,7 +459,7 @@ export function PasacallesRoute() {
                 </div>
 
                 {/* PANEL DERECHO: MAPA INTERACTIVO LEAFLET */}
-                <div className="flex-1 bg-slate-100 rounded-[32px] overflow-hidden relative border border-slate-200 z-0 h-[400px] xl:h-auto">
+                <div className="flex-1 bg-slate-100 rounded-[32px] overflow-hidden relative border border-slate-200 z-0 h-[400px] xl:h-[calc(100vh-180px)] shadow-inner">
                     <MapContainer
                         center={PUERTO_SAGUNTO_CENTER}
                         zoom={14}
@@ -363,8 +493,9 @@ export function PasacallesRoute() {
                                     <Popup className="custom-popup">
                                         <div className="text-center p-1">
                                             <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Parada {i + 1} • {stop.timeExp}</p>
-                                            <p className="font-bold text-slate-900 border-b border-slate-100 pb-2 mb-2">{stop.name}</p>
-                                            <p className="text-xs text-slate-600">{stop.address}</p>
+                                            <p className="font-bold text-slate-900 border-b border-slate-100 pb-2 mb-2 px-4 shadow-sm bg-white rounded-lg">{stop.name}</p>
+                                            <p className="text-xs text-slate-600 mt-2">{stop.address}</p>
+                                            <p className="text-[10px] font-bold text-indigo-600 mt-1 bg-indigo-50 py-1 rounded">Parada: {stop.durationMins || 10} min</p>
                                         </div>
                                     </Popup>
                                 </Marker>
@@ -372,12 +503,6 @@ export function PasacallesRoute() {
                         )}
 
                     </MapContainer>
-
-                    <div className="absolute top-4 right-4 z-[400]">
-                        <button className="bg-white/90 backdrop-blur-sm px-4 py-2 rounded-xl text-xs font-black text-slate-700 shadow flex items-center gap-2 hover:bg-white">
-                            <Download size={14} /> Exportar Ruta
-                        </button>
-                    </div>
                 </div>
 
             </div>

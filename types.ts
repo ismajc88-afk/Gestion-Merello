@@ -6,6 +6,7 @@ export interface RouteStop {
   lat?: number;
   lng?: number;
   timeExp?: string;
+  durationMins?: number;
   role: 'FMI' | 'PI' | 'FM' | 'P' | 'BANDA' | 'CASAL' | 'OTHER';
 }
 
