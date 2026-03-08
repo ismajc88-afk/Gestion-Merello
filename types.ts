@@ -7,6 +7,9 @@ export interface RouteStop {
   lng?: number;
   timeExp?: string;
   durationMins?: number;
+  status?: 'PENDING' | 'ARRIVED' | 'COMPLETED';
+  actualArrivalTime?: string;
+  actualDepartureTime?: string;
   role: 'FMI' | 'PI' | 'FM' | 'P' | 'BANDA' | 'CASAL' | 'OTHER';
 }
 
