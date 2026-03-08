@@ -28,6 +28,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
         'stock',        // Stock
         'suppliers',    // Proveedores
         'logistics',    // Tareas
+        'pasacalles',   // Rutas
     ],
 
     // Bar/Service roles
@@ -63,6 +64,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
         'work-groups',  // Grupos de trabajo
         'logistics',    // Sus tareas
         'meals',        // Menús
+        'pasacalles',   // Pasacalles
     ],
 
     // Kiosk-only roles (TPV)
@@ -137,6 +139,7 @@ export const getAllModules = () => [
     { id: 'bar', label: 'Turnos', category: 'ops' },
     { id: 'bar-profit', label: 'Cierre Caja', category: 'ops' },
     { id: 'meals', label: 'Cocina', category: 'ops' },
+    { id: 'pasacalles', label: 'Pasacalles', category: 'ops' },
     { id: 'hr', label: 'Censo', category: 'ops' },
     { id: 'tools', label: 'Calculadoras', category: 'tools' },
     { id: 'kiosk', label: 'Modo Kiosko', category: 'tools' },

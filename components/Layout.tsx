@@ -5,7 +5,7 @@ import {
    Calculator, Monitor, Settings, FileText,
    Truck, ClipboardList, Utensils, PieChart, ShoppingBag,
    ChevronRight, LogOut, User as UserIcon, HelpCircle,
-   Boxes, Menu, X, Maximize, Minimize, HardHat
+   Boxes, Menu, X, Maximize, Minimize, HardHat, Navigation
 } from 'lucide-react';
 import { UserRole } from '../types';
 import { canAccessModule, getRoleLabel } from '../utils/permissions';
@@ -65,6 +65,7 @@ export const Layout: React.FC<LayoutProps> = ({
          { id: 'ops', type: 'header', label: 'Operativa' },
          { id: 'work-groups', label: 'Grupos Trabajo', icon: HardHat },
          { id: 'logistics', label: 'Tareas', icon: ClipboardList },
+         { id: 'pasacalles', label: 'Ruta Pasacalles', icon: Navigation },
          { id: 'bar', label: 'Turnos', icon: Users },
          { id: 'bar-profit', label: 'Cierre Caja', icon: Beer },
          { id: 'meals', label: 'Cocina', icon: Utensils },
