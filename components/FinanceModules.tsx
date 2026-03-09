@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useToast } from '../hooks/useToast';
 import { Transaction, TransactionType, BudgetLine, ShoppingItem } from '../types';
-import { PlusCircle, MinusCircle, Wallet, TrendingUp, AlertTriangle, Coins, PieChart as PieIcon, Calculator, Download, ShoppingCart, ArrowRight } from 'lucide-react';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+import { PlusCircle, MinusCircle, Wallet, TrendingUp, AlertTriangle, Coins, PieChart as PieIcon, Calculator, Download, ShoppingCart, ArrowRight, Printer, Flame, Target, Trophy, Clock } from 'lucide-react';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
 interface FinanceProps {
   transactions: Transaction[];
@@ -99,12 +99,6 @@ export const FinanceModules: React.FC<FinanceProps> = ({ transactions, budgetLim
     document.body.removeChild(link);
   };
 
-  const chartData = [
-    { name: 'Gastado', value: totalExpense },
-    { name: 'Disponible', value: Math.max(0, budgetLimit - totalExpense) }
-  ];
-  const COLORS = ['#ef4444', '#10b981'];
-
   const calculateCashTotal = () => {
     return Object.entries(cashCounts).reduce((acc: number, [denom, count]) => acc + (parseFloat(denom) * Number(count)), 0);
   };
@@ -114,6 +108,32 @@ export const FinanceModules: React.FC<FinanceProps> = ({ transactions, budgetLim
 
   const unitsSold = auditItem.start - auditItem.end;
   const expectedRevenue = unitsSold * auditItem.price;
+
+  // --- SEMANA FALLERA DASHBOARD LOGIC ---
+  const isBreakEven = balance > 0 && totalIncome > 0;
+  const roiPercentage = totalExpense === 0 ? 100 : (totalIncome / totalExpense) * 100;
+
+  const forecast = React.useMemo(() => {
+    if (transactions.length === 0) return { dailyBurn: 0, estimatedFinal: 0, daysElapsed: 0 };
+    const dates = transactions.map(t => new Date(t.date).getTime());
+    const minD = Math.min(...dates);
+    const maxD = Math.max(...dates);
+    const msInDay = 1000 * 60 * 60 * 24;
+    const daysElapsed = Math.max(1, (maxD - minD) / msInDay);
+    const dailyBurn = totalExpense / daysElapsed;
+    const remainingDays = Math.max(0, 5 - daysElapsed); // Fallas = 5 days
+    const estimatedFinal = totalIncome - (totalExpense + (dailyBurn * remainingDays));
+    return { dailyBurn, estimatedFinal, daysElapsed };
+  }, [transactions, totalExpense, totalIncome]);
+
+  const hourlyData = React.useMemo(() => {
+    const data = Array.from({ length: 24 }, (_, i) => ({ hour: `${String(i).padStart(2, '0')}h`, Ingresos: 0 }));
+    transactions.filter(t => t.type === TransactionType.INCOME).forEach(t => {
+      const h = new Date(t.date).getHours();
+      data[h].Ingresos += t.amount;
+    });
+    return data;
+  }, [transactions]);
 
   return (
     <div className="space-y-6">
@@ -157,23 +177,101 @@ export const FinanceModules: React.FC<FinanceProps> = ({ transactions, budgetLim
       </div>
 
       {activeTab === 'overview' && (
-        <div className="bg-white p-6 rounded-xl shadow-sm h-64 flex flex-col md:flex-row items-center justify-around">
-          <div className="w-full md:w-1/2 h-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={chartData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                  {chartData.map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+        <div className="space-y-6">
+          {/* BREAK-EVEN ALERT */}
+          {isBreakEven && (
+            <div className="bg-gradient-to-r from-emerald-500 to-teal-400 text-white p-4 rounded-xl shadow-lg flex items-center justify-between animate-in fade-in slide-in-from-top-4">
+              <div className="flex items-center gap-3">
+                <Trophy size={32} className="text-yellow-300" />
+                <div>
+                  <h3 className="font-black text-xl uppercase tracking-wider">¡Punto de Equilibrio Superado!</h3>
+                  <p className="text-emerald-100 text-sm font-medium">La Falla ha cubierto todos los gastos de la semana. A partir de ahora es beneficio limpio.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TOP CONTROLS */}
+          <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+            <h3 className="font-black text-slate-800 text-lg flex items-center gap-2">
+              <Flame className="text-orange-500" /> Dashboard Semana Fallera
+            </h3>
+            <button onClick={() => window.print()} className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-slate-800 transition-colors shadow">
+              <Printer size={16} /> Cierre Día 20 (PDF)
+            </button>
           </div>
-          <div className="text-center md:text-left">
-            <h3 className="text-lg font-bold mb-2">Estado Financiero</h3>
-            <p className="text-sm text-gray-600">Has consumido el {((totalExpense / budgetLimit) * 100).toFixed(1)}% del presupuesto.</p>
-            <p className="text-xs text-gray-400 mt-2">Saldo Neto: {balance > 0 ? '+' : ''}{balance}€</p>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* ROI SPEEDOMETER */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-center items-center">
+              <h4 className="font-bold text-slate-600 mb-4 flex items-center gap-2"><Target size={18} /> Rentabilidad (ROI)</h4>
+              <div className="w-full h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={[{ name: 'ROI', value: roiPercentage }, { name: 'Resto', value: Math.max(0, 100 - roiPercentage) }]}
+                      cx="50%" cy="100%" startAngle={180} endAngle={0}
+                      innerRadius={80} outerRadius={120}
+                      dataKey="value"
+                      stroke="none"
+                    >
+                      <Cell fill={roiPercentage >= 100 ? '#10b981' : roiPercentage > 75 ? '#f59e0b' : '#ef4444'} />
+                      <Cell fill="#f1f5f9" />
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="text-center -mt-10">
+                <p className={`text-4xl font-black ${roiPercentage >= 100 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                  {roiPercentage.toFixed(1)}%
+                </p>
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Ingresos vs Gastos</p>
+              </div>
+            </div>
+
+            {/* FORECAST */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-center">
+              <h4 className="font-bold text-slate-600 mb-6 flex items-center gap-2"><TrendingUp size={18} /> Proyección de Aterrizaje</h4>
+
+              <div className="space-y-6">
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-slate-500 font-medium">Ritmo de Gasto Diario</span>
+                    <span className="font-bold text-rose-500">{forecast.dailyBurn.toFixed(2)}€ / día</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2">
+                    <div className="bg-rose-400 h-2 rounded-full" style={{ width: `${Math.min(100, (forecast.dailyBurn / budgetLimit) * 100)}%` }}></div>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <p className="text-sm text-slate-500 font-medium mb-1">Estimación Saldo Final (Día 20)</p>
+                  <p className={`text-3xl font-black ${forecast.estimatedFinal >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    {forecast.estimatedFinal > 0 ? '+' : ''}{forecast.estimatedFinal.toFixed(2)}€
+                  </p>
+                  <p className="text-xs text-slate-400 mt-2">Basado en un evento de 5 días (Han pasado {forecast.daysElapsed.toFixed(1)} días)</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* HEATMAP POR HORAS */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 print:break-inside-avoid">
+            <h4 className="font-bold text-slate-600 mb-6 flex items-center gap-2"><Clock size={18} /> Mapa de Calor: Horas de Mayor Ingreso</h4>
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={hourlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis dataKey="hour" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
+                  <Tooltip
+                    cursor={{ fill: '#f8fafc' }}
+                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  />
+                  <Bar dataKey="Ingresos" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
       )}
