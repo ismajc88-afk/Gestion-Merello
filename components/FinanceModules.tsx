@@ -114,15 +114,25 @@ export const FinanceModules: React.FC<FinanceProps> = ({ transactions, budgetLim
   const roiPercentage = totalExpense === 0 ? 100 : (totalIncome / totalExpense) * 100;
 
   const forecast = React.useMemo(() => {
-    if (transactions.length === 0) return { dailyBurn: 0, estimatedFinal: 0, daysElapsed: 0 };
-    const dates = transactions.map(t => new Date(t.date).getTime());
-    const minD = Math.min(...dates);
-    const maxD = Math.max(...dates);
+    if (transactions.length === 0 || totalExpense === 0) return { dailyBurn: 0, estimatedFinal: totalIncome, daysElapsed: 0 };
+
+    // Fallas are strictly from March 15th to March 19th (5 days).
+    // Transactions from Feb/Early March should count as "Day 1" burn for the event itself.
+    const currentYear = new Date().getFullYear();
+    const eventStartDate = new Date(`${currentYear}-03-15T00:00:00`).getTime();
+    const now = Date.now();
+
+    // If we haven't reached Fallas yet, assume we are on Day 1 for projection purposes.
+    // If Fallas is over, lock it to 5 days.
+    let msElapsed = Math.max(0, now - eventStartDate);
     const msInDay = 1000 * 60 * 60 * 24;
-    const daysElapsed = Math.max(1, (maxD - minD) / msInDay);
+    let daysElapsed = Math.max(1, msElapsed / msInDay);
+    if (daysElapsed > 5) daysElapsed = 5;
+
     const dailyBurn = totalExpense / daysElapsed;
-    const remainingDays = Math.max(0, 5 - daysElapsed); // Fallas = 5 days
+    const remainingDays = Math.max(0, 5 - daysElapsed);
     const estimatedFinal = totalIncome - (totalExpense + (dailyBurn * remainingDays));
+
     return { dailyBurn, estimatedFinal, daysElapsed };
   }, [transactions, totalExpense, totalIncome]);
 
