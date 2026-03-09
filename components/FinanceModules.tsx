@@ -117,20 +117,19 @@ export const FinanceModules: React.FC<FinanceProps> = ({ transactions, budgetLim
     if (transactions.length === 0 || totalExpense === 0) return { dailyBurn: 0, estimatedFinal: totalIncome, daysElapsed: 0 };
 
     // Fallas are strictly from March 15th to March 19th (5 days).
-    // Transactions from Feb/Early March should count as "Day 1" burn for the event itself.
     const currentYear = new Date().getFullYear();
     const eventStartDate = new Date(`${currentYear}-03-15T00:00:00`).getTime();
     const now = Date.now();
 
-    // If we haven't reached Fallas yet, assume we are on Day 1 for projection purposes.
-    // If Fallas is over, lock it to 5 days.
     let msElapsed = Math.max(0, now - eventStartDate);
     const msInDay = 1000 * 60 * 60 * 24;
+
+    // We cap it at 1 minimum (to avoid infinity) and 5 maximum.
     let daysElapsed = Math.max(1, msElapsed / msInDay);
     if (daysElapsed > 5) daysElapsed = 5;
 
     const dailyBurn = totalExpense / daysElapsed;
-    const remainingDays = Math.max(0, 5 - daysElapsed);
+    const remainingDays = 5 - daysElapsed;
     const estimatedFinal = totalIncome - (totalExpense + (dailyBurn * remainingDays));
 
     return { dailyBurn, estimatedFinal, daysElapsed };
@@ -259,7 +258,9 @@ export const FinanceModules: React.FC<FinanceProps> = ({ transactions, budgetLim
                   <p className={`text-3xl font-black ${forecast.estimatedFinal >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                     {forecast.estimatedFinal > 0 ? '+' : ''}{forecast.estimatedFinal.toFixed(2)}€
                   </p>
-                  <p className="text-xs text-slate-400 mt-2">Basado en un evento de 5 días (Han pasado {forecast.daysElapsed.toFixed(1)} días)</p>
+                  <p className="text-xs text-slate-400 mt-2">
+                    Basado en evento de 5 días (Contabilidad al {forecast.daysElapsed === 5 ? '100%' : `${((forecast.daysElapsed / 5) * 100).toFixed(0)}%`} - Día {forecast.daysElapsed.toFixed(0)} de 5)
+                  </p>
                 </div>
               </div>
             </div>
