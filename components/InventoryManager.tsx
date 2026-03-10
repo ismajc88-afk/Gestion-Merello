@@ -56,24 +56,27 @@ export const InventoryManager: React.FC<Props> = ({ data, onUpdateBudget, onUpda
 
    // Burn Rate: Gasto por día
    const daysOfData = useMemo(() => {
-      if (internalExpenses.length < 2) return 1;
-      const first = new Date(internalExpenses[0].date).getTime();
-      const last = new Date(internalExpenses[internalExpenses.length - 1].date).getTime();
-      return Math.max(1, Math.ceil((last - first) / (1000 * 60 * 60 * 24)));
-   }, [internalExpenses]);
+      // Fallas are strictly from March 15th to March 19th (5 days).
+      const currentYear = new Date().getFullYear();
+      const eventStartDate = new Date(`${currentYear}-03-15T00:00:00`).getTime();
+      const now = Date.now();
+
+      let msElapsed = Math.max(0, now - eventStartDate);
+      const msInDay = 1000 * 60 * 60 * 24;
+
+      // We cap it at 1 minimum and 5 maximum for the event duration.
+      let days = Math.max(1, msElapsed / msInDay);
+      if (days > 5) days = 5;
+      return days;
+   }, []);
 
    const burnRate = totalSpent / daysOfData;
-   const costPerFallero = data.members.length > 0 ? totalSpent / data.members.length : 0;
    const barROI = barExpenses > 0 ? ((barRevenue - barExpenses) / barExpenses) * 100 : 0;
 
-   // Max Recommended Burn Rate Calculation
+   // Max Recommended Burn Rate Calculation (Total Budget / 5 Days of Event)
    const maxBurnRate = useMemo(() => {
-      if (!data.appConfig.startDate || !data.appConfig.endDate) return totalBudget / 30; // Fallback default
-      const start = new Date(data.appConfig.startDate).getTime();
-      const end = new Date(data.appConfig.endDate).getTime();
-      const totalDays = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
-      return totalBudget / totalDays;
-   }, [data.appConfig.startDate, data.appConfig.endDate, totalBudget]);
+      return totalBudget / 5;
+   }, [totalBudget]);
 
    const burnHealth = burnRate > maxBurnRate * 1.15 ? 'CRITICAL' : burnRate > maxBurnRate ? 'WARNING' : 'HEALTHY';
 
@@ -248,12 +251,12 @@ export const InventoryManager: React.FC<Props> = ({ data, onUpdateBudget, onUpda
 
                <div className="pt-6 border-t border-white/10 relative z-10 grid grid-cols-2 gap-4">
                   <div>
-                     <p className="text-[9px] font-black opacity-60 uppercase tracking-widest mb-0.5">Coste/Fallero</p>
-                     <p className="text-xl font-black tabular-nums">{costPerFallero.toFixed(1)}€</p>
+                     <p className="text-[9px] font-black opacity-60 uppercase tracking-widest mb-0.5">Progreso Semana</p>
+                     <p className="text-xl font-black tabular-nums">{Math.round((daysOfData / 5) * 100)}%</p>
                   </div>
                   <div>
-                     <p className="text-[9px] font-black opacity-60 uppercase tracking-widest mb-0.5">Días Activos</p>
-                     <p className="text-xl font-black tabular-nums">{daysOfData}</p>
+                     <p className="text-[9px] font-black opacity-60 uppercase tracking-widest mb-0.5">Día de Fiesta</p>
+                     <p className="text-xl font-black tabular-nums">{daysOfData.toFixed(0)} de 5</p>
                   </div>
                </div>
             </div>
