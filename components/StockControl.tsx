@@ -4,8 +4,7 @@ import { StockItem, BarSession, Incident } from '../types';
 import {
    Package, Plus, Minus, Search, Wine, Utensils,
    Box, Edit3, Trash2, X, Lock,
-   ShoppingBag, User, 
-   BarChart3, TrendingUp, Clock, Zap, AlertTriangle, 
+   BarChart3, TrendingUp, Clock, AlertTriangle, 
    MoreHorizontal, ShieldAlert,
    Camera, Image
 } from 'lucide-react';
@@ -30,7 +29,7 @@ export const StockControl: React.FC<Props> = ({
    onUpdateStock, onAddItem, onDelete, onUpdateItem
 }) => {
    const [filterCat, setFilterCat] = useState<string>('ALL');
-   const [filterUsage, setFilterUsage] = useState<'ALL' | 'CASAL' | 'VENTA'>('ALL');
+
    const [search, setSearch] = useState('');
    const [showAddForm, setShowAddForm] = useState(false);
    const [editingItem, setEditingItem] = useState<StockItem | null>(null);
@@ -41,23 +40,22 @@ export const StockControl: React.FC<Props> = ({
    const [contextMenu, setContextMenu] = useState<string | null>(null);
 
    const [newItem, setNewItem] = useState<Partial<StockItem>>({
-      name: '', quantity: 0, minStock: 5, unit: units[0] || 'u', category: categories[0] || 'BEBIDA', location: 'Almacén', costPerUnit: 0, usageType: 'CASAL', dailyLimit: 0
+      name: '', quantity: 0, minStock: 5, unit: units[0] || 'u', category: categories[0] || 'BEBIDA', location: 'Almacén', costPerUnit: 0, dailyLimit: 0
    });
 
    const filteredItems = useMemo(() => {
       return items.filter(i => {
          const matchesSearch = i.name.toLowerCase().includes(search.toLowerCase());
          const matchesCat = filterCat === 'ALL' || i.category === filterCat;
-         const matchesUsage = filterUsage === 'ALL' || i.usageType === filterUsage;
-         return matchesSearch && matchesCat && matchesUsage;
+         return matchesSearch && matchesCat;
       });
-   }, [items, search, filterCat, filterUsage]);
+   }, [items, search, filterCat]);
 
-   // --- HELPER: Get Today's Usage for Casal Items ---
+   // --- HELPER: Get Today's Usage ---
    const getTodayUsage = (itemId: string) => {
       const today = new Date().toISOString().split('T')[0];
       return incidents
-         .filter(inc => inc.stockItemId === itemId && inc.timestamp.startsWith(today) && (inc.terminal === 'CASAL' || !inc.terminal)) // Support legacy incidents without terminal
+         .filter(inc => inc.stockItemId === itemId && inc.timestamp.startsWith(today))
          .reduce((acc, inc) => acc + (inc.quantity || 1), 0);
    };
 
@@ -67,30 +65,26 @@ export const StockControl: React.FC<Props> = ({
 
       let history: { date: string, quantity: number, hour: number }[] = [];
 
-      // 1. Gather Data based on usage type
-      if (editingItem.usageType === 'VENTA') {
-         barSessions.forEach(session => {
-            const consumption = session.consumptions.find(c => c.stockItemId === editingItem.id);
-            if (consumption) {
-               const dateObj = new Date(session.date);
-               history.push({
-                  date: dateObj.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }),
-                  quantity: consumption.quantity,
-                  hour: dateObj.getHours()
-               });
-            }
-         });
-      } else {
-         // For CASAL, we look at resolved incidents/requests
-         incidents.filter(inc => inc.stockItemId === editingItem.id).forEach(inc => {
-            const dateObj = new Date(inc.timestamp);
+      // 1. Gather Data from both bar sessions and incidents
+      barSessions.forEach(session => {
+         const consumption = session.consumptions.find(c => c.stockItemId === editingItem.id);
+         if (consumption) {
+            const dateObj = new Date(session.date);
             history.push({
                date: dateObj.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }),
-               quantity: inc.quantity || 1,
+               quantity: consumption.quantity,
                hour: dateObj.getHours()
             });
+         }
+      });
+      incidents.filter(inc => inc.stockItemId === editingItem.id).forEach(inc => {
+         const dateObj = new Date(inc.timestamp);
+         history.push({
+            date: dateObj.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }),
+            quantity: inc.quantity || 1,
+            hour: dateObj.getHours()
          });
-      }
+      });
 
       // 2. Process Daily Trend
       const dailyMap = new Map<string, number>();
@@ -163,11 +157,10 @@ export const StockControl: React.FC<Props> = ({
          category: newItem.category || 'BEBIDA',
          location: newItem.location || 'Almacén',
          costPerUnit: Number(newItem.costPerUnit) || 0,
-         usageType: newItem.usageType as any || 'CASAL',
-         dailyLimit: newItem.usageType === 'CASAL' ? Number(newItem.dailyLimit) : undefined,
-         imageUrl: newItem.imageUrl // ✅ Include photo
+         dailyLimit: Number(newItem.dailyLimit) || undefined,
+         imageUrl: newItem.imageUrl
       });
-      setNewItem({ name: '', quantity: 0, minStock: 5, unit: units[0] || 'u', category: categories[0] || 'BEBIDA', location: 'Almacén', costPerUnit: 0, usageType: 'CASAL', dailyLimit: 0 });
+      setNewItem({ name: '', quantity: 0, minStock: 5, unit: units[0] || 'u', category: categories[0] || 'BEBIDA', location: 'Almacén', costPerUnit: 0, dailyLimit: 0 });
       setShowAddForm(false);
    };
 
@@ -182,29 +175,17 @@ export const StockControl: React.FC<Props> = ({
       <div className="flex flex-col gap-4 md:gap-6 animate-in fade-in duration-500 w-full pb-32">
 
          {/* 1. KPIs HEADER */}
-         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-slate-900 rounded-[32px] p-6 text-white relative overflow-hidden shadow-xl flex flex-col justify-between h-32 md:h-40 group">
                <div className="relative z-10">
-                  <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Valor Venta</p>
-                  <h3 className="text-3xl md:text-4xl font-black tabular-nums">{items.filter(i => i.usageType === 'VENTA').reduce((acc, i) => acc + (i.quantity * i.costPerUnit), 0).toFixed(0)}€</h3>
+                  <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Valor Total Stock</p>
+                  <h3 className="text-3xl md:text-4xl font-black tabular-nums">{items.reduce((acc, i) => acc + (i.quantity * i.costPerUnit), 0).toFixed(0)}€</h3>
                </div>
                <div className="relative z-10 flex items-center gap-2">
                   <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">Stock Comercial</span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Almacén Unificado • {items.length} productos</span>
                </div>
-               <ShoppingBag size={100} className="absolute -right-4 -bottom-6 opacity-10 rotate-12 group-hover:scale-110 transition-transform" />
-            </div>
-
-            <div className="bg-orange-50 border-2 border-orange-100 rounded-[32px] p-6 text-slate-900 relative overflow-hidden shadow-sm flex flex-col justify-between h-32 md:h-40 group">
-               <div className="relative z-10">
-                  <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-1">Valor Casal</p>
-                  <h3 className="text-3xl md:text-4xl font-black tabular-nums">{items.filter(i => i.usageType === 'CASAL').reduce((acc, i) => acc + (i.quantity * i.costPerUnit), 0).toFixed(0)}€</h3>
-               </div>
-               <div className="relative z-10 flex items-center gap-2">
-                  <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                  <span className="text-[10px] font-bold text-orange-400 uppercase">Consumo Interno</span>
-               </div>
-               <User size={100} className="absolute -right-4 -bottom-6 opacity-5 rotate-12 text-orange-600 group-hover:scale-110 transition-transform" />
+               <Package size={100} className="absolute -right-4 -bottom-6 opacity-10 rotate-12 group-hover:scale-110 transition-transform" />
             </div>
 
             <button onClick={() => setShowAddForm(true)} className="bg-white border-2 border-slate-200 rounded-[32px] p-6 text-slate-900 shadow-sm flex flex-col items-center justify-center gap-3 active:scale-95 transition-all h-32 md:h-40 hover:border-indigo-300 group">
@@ -225,10 +206,7 @@ export const StockControl: React.FC<Props> = ({
                      className="w-full pl-11 pr-4 py-3 bg-transparent text-sm font-bold outline-none text-slate-800 placeholder:text-slate-400"
                   />
                </div>
-               <div className="w-px h-6 bg-slate-200"></div>
-               <button onClick={() => setFilterUsage(f => f === 'ALL' ? 'VENTA' : f === 'VENTA' ? 'CASAL' : 'ALL')} className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-[10px] uppercase tracking-wide transition-colors min-w-[80px] justify-center ${filterUsage === 'VENTA' ? 'bg-indigo-100 text-indigo-700' : filterUsage === 'CASAL' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-600'}`}>
-                  {filterUsage === 'ALL' ? 'Todos' : filterUsage}
-               </button>
+
             </div>
 
             {/* Categories Scroll */}
@@ -245,21 +223,13 @@ export const StockControl: React.FC<Props> = ({
          <div className={`grid gap-3 md:gap-4 ${viewMode === 'GRID' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
             {filteredItems.map(item => {
                const isLowStock = item.quantity <= item.minStock;
-               const isVenta = item.usageType === 'VENTA';
-               const todayUsage = !isVenta ? getTodayUsage(item.id) : 0;
+               const todayUsage = getTodayUsage(item.id);
                const limit = item.dailyLimit || 0;
                const hasLimit = limit > 0;
                const isOverLimit = hasLimit && todayUsage >= limit;
 
-               // THEME DEFINITIONS
-               const cardBg = isVenta ? 'bg-white' : 'bg-orange-50/40';
-               const cardBorder = isOverLimit ? 'border-rose-500' : isVenta ? 'border-slate-100' : 'border-orange-200';
-               const iconBg = isVenta ? 'bg-indigo-50 text-indigo-600' : 'bg-orange-100 text-orange-600';
-               const typeLabel = isVenta ? 'VENTA PÚBLICO' : 'BARRA FALLERA (CASAL)';
-               const typeColor = isVenta ? 'text-indigo-400' : 'text-orange-600';
-
                return (
-                  <div key={item.id} className={`rounded-[32px] p-4 md:p-5 shadow-sm border-2 relative transition-all ${cardBg} ${cardBorder} ${isLowStock ? 'ring-4 ring-rose-100' : ''} ${isOverLimit ? 'bg-rose-50' : ''}`}>
+                  <div key={item.id} className={`rounded-[32px] p-4 md:p-5 shadow-sm border-2 relative transition-all bg-white ${isOverLimit ? 'border-rose-500 bg-rose-50' : 'border-slate-100'} ${isLowStock ? 'ring-4 ring-rose-100' : ''}`}>
 
                      {/* CARD HEADER */}
                      <div className="flex justify-between items-start mb-4">
@@ -267,29 +237,29 @@ export const StockControl: React.FC<Props> = ({
                            {item.imageUrl ? (
                               <img src={item.imageUrl} alt={item.name} className="w-12 h-12 md:w-14 md:h-14 rounded-2xl object-cover shrink-0 shadow-sm border-2 border-white" />
                            ) : (
-                              <div className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${isOverLimit ? 'bg-rose-500 text-white animate-pulse' : iconBg}`}>
+                              <div className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${isOverLimit ? 'bg-rose-500 text-white animate-pulse' : 'bg-indigo-50 text-indigo-600'}`}>
                                  {isOverLimit ? <ShieldAlert size={20} className="md:w-6 md:h-6" /> : item.category.includes('BEBIDA') ? <Wine size={20} className="md:w-6 md:h-6" /> : <Utensils size={20} className="md:w-6 md:h-6" />}
                               </div>
                            )}
                            <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2 mb-0.5">
-                                 <span className={`text-[8px] font-black uppercase tracking-widest ${isOverLimit ? 'text-rose-600' : typeColor}`}>{isOverLimit ? 'CUPO AGOTADO' : typeLabel}</span>
+                                 <span className={`text-[8px] font-black uppercase tracking-widest ${isOverLimit ? 'text-rose-600' : 'text-indigo-400'}`}>{isOverLimit ? 'CUPO AGOTADO' : item.category}</span>
                                  {item.category && <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest hidden md:inline">• {item.category}</span>}
                               </div>
                               <h4 className="font-black text-slate-900 text-base md:text-lg leading-tight truncate uppercase italic">{item.name}</h4>
 
                               {/* LIVE QUOTA TRACKER */}
-                              {!isVenta && hasLimit && (
+                              {hasLimit && (
                                  <div className="mt-2 w-full">
                                     <div className="flex justify-between text-[9px] font-bold uppercase tracking-wide mb-1">
-                                       <span className={isOverLimit ? 'text-rose-600' : 'text-orange-700'}>
+                                       <span className={isOverLimit ? 'text-rose-600' : 'text-indigo-700'}>
                                           {isOverLimit ? `¡Límite Superado!` : `${todayUsage} / ${limit}`}
                                        </span>
                                        <span className="text-slate-400">{((todayUsage / limit) * 100).toFixed(0)}%</span>
                                     </div>
-                                    <div className="h-1.5 w-full bg-white/50 rounded-full overflow-hidden border border-orange-100">
+                                    <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden border border-slate-200">
                                        <div
-                                          className={`h-full transition-all duration-500 ${isOverLimit ? 'bg-rose-500' : todayUsage / limit > 0.8 ? 'bg-orange-500' : 'bg-emerald-500'}`}
+                                          className={`h-full transition-all duration-500 ${isOverLimit ? 'bg-rose-500' : todayUsage / limit > 0.8 ? 'bg-amber-500' : 'bg-emerald-500'}`}
                                           style={{ width: `${Math.min((todayUsage / limit) * 100, 100)}%` }}
                                        ></div>
                                     </div>
@@ -297,12 +267,7 @@ export const StockControl: React.FC<Props> = ({
                               )}
 
                               {/* NO LIMIT BADGE */}
-                              {!isVenta && !hasLimit && (
-                                 <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-orange-100/50 border border-orange-200/50">
-                                    <Zap size={10} className="text-orange-500 fill-orange-500" />
-                                    <span className="text-[8px] md:text-[9px] font-black text-orange-600 uppercase tracking-wide">Barra Libre</span>
-                                 </div>
-                              )}
+
 
                               {/* LOW STOCK INDICATOR */}
                               {isLowStock && (
@@ -318,8 +283,8 @@ export const StockControl: React.FC<Props> = ({
                      </div>
 
                      {/* QUANTITY STEPPER (MASSIVE TOUCH TARGET) */}
-                     <div className={`rounded-[24px] p-1.5 flex items-center justify-between border relative overflow-hidden ${isVenta ? 'bg-slate-50 border-slate-200' : 'bg-white border-orange-200 shadow-sm'}`}>
-                        <button onClick={() => onUpdateStock(item.id, Math.max(0, item.quantity - 1))} className={`w-12 h-10 md:w-14 md:h-12 flex items-center justify-center rounded-[20px] active:scale-90 transition-all z-10 border ${isVenta ? 'bg-white shadow-sm border-slate-100 text-slate-400' : 'bg-orange-50 border-orange-100 text-orange-400'}`}>
+                     <div className="rounded-[24px] p-1.5 flex items-center justify-between border relative overflow-hidden bg-slate-50 border-slate-200">
+                        <button onClick={() => onUpdateStock(item.id, Math.max(0, item.quantity - 1))} className="w-12 h-10 md:w-14 md:h-12 flex items-center justify-center rounded-[20px] active:scale-90 transition-all z-10 border bg-white shadow-sm border-slate-100 text-slate-400">
                            <Minus size={20} className="md:w-6 md:h-6" />
                         </button>
 
@@ -328,12 +293,12 @@ export const StockControl: React.FC<Props> = ({
                            <span className="text-[8px] md:text-[9px] font-bold text-slate-400 uppercase tracking-widest">{item.unit}</span>
                         </div>
 
-                        <button onClick={() => onUpdateStock(item.id, item.quantity + 1)} className={`w-12 h-10 md:w-14 md:h-12 flex items-center justify-center rounded-[20px] shadow-lg text-white active:scale-90 transition-all z-10 ${isVenta ? 'bg-indigo-600 shadow-indigo-200' : 'bg-orange-500 shadow-orange-200'}`}>
+                        <button onClick={() => onUpdateStock(item.id, item.quantity + 1)} className="w-12 h-10 md:w-14 md:h-12 flex items-center justify-center rounded-[20px] shadow-lg text-white active:scale-90 transition-all z-10 bg-indigo-600 shadow-indigo-200">
                            <Plus size={20} className="md:w-6 md:h-6" />
                         </button>
 
                         {/* Progress Bar Background */}
-                        <div className={`absolute bottom-0 left-0 h-1 transition-all ${isLowStock ? 'bg-rose-500' : isVenta ? 'bg-indigo-200' : 'bg-orange-300'}`} style={{ width: `${Math.min((item.quantity / (item.minStock * 3)) * 100, 100)}%` }}></div>
+                        <div className={`absolute bottom-0 left-0 h-1 transition-all ${isLowStock ? 'bg-rose-500' : 'bg-indigo-200'}`} style={{ width: `${Math.min((item.quantity / (item.minStock * 3)) * 100, 100)}%` }}></div>
                      </div>
 
                      {/* CONTEXT MENU OVERLAY */}
@@ -380,10 +345,6 @@ export const StockControl: React.FC<Props> = ({
                      <input placeholder="Nombre (ej. Coca Cola)" value={newItem.name} onChange={e => setNewItem({ ...newItem, name: e.target.value })} className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold outline-none focus:border-indigo-500 uppercase" />
 
                      <div className="grid grid-cols-2 gap-4">
-                        <select value={newItem.usageType} onChange={e => setNewItem({ ...newItem, usageType: e.target.value as any })} className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-xs uppercase outline-none">
-                           <option value="VENTA">Venta</option>
-                           <option value="CASAL">Casal (Barra Fallera)</option>
-                        </select>
                         <select value={newItem.category} onChange={e => setNewItem({ ...newItem, category: e.target.value })} className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-xs uppercase outline-none">
                            {categories.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
@@ -402,20 +363,18 @@ export const StockControl: React.FC<Props> = ({
                         </div>
                      </div>
 
-                     {/* Daily Limit Input for CASAL */}
-                     {newItem.usageType === 'CASAL' && (
-                        <div className="bg-orange-50 p-4 rounded-2xl border border-orange-100">
-                           <label className="text-[9px] font-black text-orange-500 uppercase tracking-widest mb-1 flex items-center gap-2"><Lock size={10} /> Cupo Diario (Opcional)</label>
-                           <input
-                              type="number"
-                              placeholder="0 = Sin límite"
-                              value={newItem.dailyLimit}
-                              onChange={e => setNewItem({ ...newItem, dailyLimit: Number(e.target.value) })}
-                              className="w-full p-3 bg-white border border-orange-200 rounded-xl font-bold text-orange-900 outline-none focus:border-orange-400"
-                           />
-                           <p className="text-[9px] text-orange-400 mt-2 leading-tight">Si pones 0, será barra libre. Si pones un número, la app avisará al superar ese consumo diario.</p>
-                        </div>
-                     )}
+                     {/* Daily Limit Input */}
+                     <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
+                        <label className="text-[9px] font-black text-indigo-500 uppercase tracking-widest mb-1 flex items-center gap-2"><Lock size={10} /> Cupo Diario (Opcional)</label>
+                        <input
+                           type="number"
+                           placeholder="0 = Sin límite"
+                           value={newItem.dailyLimit}
+                           onChange={e => setNewItem({ ...newItem, dailyLimit: Number(e.target.value) })}
+                           className="w-full p-3 bg-white border border-indigo-200 rounded-xl font-bold text-indigo-900 outline-none focus:border-indigo-400"
+                        />
+                        <p className="text-[9px] text-indigo-400 mt-2 leading-tight">Si pones 0, sin límite. Si pones un número, la app avisará al superar ese consumo diario.</p>
+                     </div>
 
                      {/* Photo Upload */}
                      <div className="space-y-2">
@@ -454,7 +413,7 @@ export const StockControl: React.FC<Props> = ({
                <div className="bg-white w-full h-[95vh] md:h-[85vh] md:max-w-3xl rounded-t-[32px] md:rounded-[40px] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom md:zoom-in-95">
                   <div className="p-4 md:p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/80 shrink-0">
                      <div className="flex items-center gap-3 md:gap-4">
-                        <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center text-white ${editingItem.usageType === 'VENTA' ? 'bg-indigo-600' : 'bg-orange-500'}`}>
+                        <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center text-white bg-indigo-600">
                            <Box size={20} className="md:w-6 md:h-6" />
                         </div>
                         <div>
@@ -495,18 +454,16 @@ export const StockControl: React.FC<Props> = ({
                               </div>
 
                               {/* DAILY LIMIT EDIT */}
-                              {editingItem.usageType === 'CASAL' && (
-                                 <div className="md:col-span-2 space-y-2 bg-orange-50 p-4 rounded-3xl border border-orange-100">
-                                    <label className="text-[10px] font-black text-orange-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Lock size={12} /> Límite de Consumo Diario</label>
-                                    <input
-                                       type="number"
-                                       value={editingItem.dailyLimit || 0}
-                                       onChange={e => setEditingItem({ ...editingItem, dailyLimit: Number(e.target.value) })}
-                                       className="w-full p-4 bg-white border-2 border-orange-200 rounded-2xl font-black text-xl outline-none focus:border-orange-400 text-orange-900"
-                                    />
-                                    <p className="text-[9px] text-orange-400 leading-tight">0 = Barra libre. Número = Cupo máximo permitido.</p>
-                                 </div>
-                              )}
+                              <div className="md:col-span-2 space-y-2 bg-indigo-50 p-4 rounded-3xl border border-indigo-100">
+                                 <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Lock size={12} /> Límite de Consumo Diario</label>
+                                 <input
+                                    type="number"
+                                    value={editingItem.dailyLimit || 0}
+                                    onChange={e => setEditingItem({ ...editingItem, dailyLimit: Number(e.target.value) })}
+                                    className="w-full p-4 bg-white border-2 border-indigo-200 rounded-2xl font-black text-xl outline-none focus:border-indigo-400 text-indigo-900"
+                                 />
+                                 <p className="text-[9px] text-indigo-400 leading-tight">0 = Sin límite. Número = Cupo máximo permitido por día.</p>
+                              </div>
                            </div>
 
                            {/* Photo Upload in Edit Form */}

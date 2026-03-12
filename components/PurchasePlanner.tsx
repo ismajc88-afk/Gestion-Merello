@@ -119,11 +119,10 @@ export const PurchasePlanner: React.FC<Props> = ({ catalog, onUpdateCatalog, onC
     };
 
     const handleAutoFill = () => {
-        const usageType = activePlan.type === 'BAR' ? 'VENTA' : 'CASAL';
-        const needsRestock = stock.filter(s => s.usageType === usageType && s.quantity <= s.minStock);
+        const needsRestock = stock.filter(s => s.quantity <= s.minStock);
 
         if (needsRestock.length === 0) {
-            toast.success("✅ El inventario está saludable. No hay roturas de stock detectadas para este tipo de almacén.");
+            toast.success("✅ El inventario está saludable. No hay roturas de stock detectadas.");
             return;
         }
 
@@ -206,7 +205,7 @@ export const PurchasePlanner: React.FC<Props> = ({ catalog, onUpdateCatalog, onC
             </div>
             <div class="logo"><img src="${ESCUDO_BASE64}" style="width:100%; height:100%; object-fit:contain;" /></div>
           </div>
-          <p><strong>Destino:</strong> ${activePlan.type === 'BAR' ? 'Barra / Venta' : 'Casal / Interno'}</p>
+          <p><strong>Destino:</strong> ${activePlan.type === 'BAR' ? 'Barra / Venta' : 'Casal / Interno'} (Almacén General)</p>
           <table>
             <thead><tr><th width="50%">Producto</th><th width="15%" class="center">Cant.</th><th width="15%" class="center">Unidad</th><th width="20%" class="center">Categoría</th></tr></thead>
             <tbody>${itemsRows}</tbody>

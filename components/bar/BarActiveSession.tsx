@@ -229,7 +229,7 @@ export const BarActiveSession: React.FC<Props> = ({
                     <div className="flex flex-col md:flex-row gap-3 bg-white p-2 rounded-[32px] border-2 border-slate-100 shadow-sm">
                         <select value={selectedStockId} onChange={e => setSelectedStockId(e.target.value)} className="flex-[3] p-4 bg-slate-50 rounded-2xl font-bold outline-none text-sm appearance-none border border-transparent focus:border-indigo-100 uppercase">
                             <option value="">Seleccionar botella/pack...</option>
-                            {data.stock.filter(i => i.usageType === 'VENTA' && i.quantity > 0).map(i => (
+                            {data.stock.filter(i => i.quantity > 0).map(i => (
                                 <option key={i.id} value={i.id}>{i.name} (Coste: {i.costPerUnit}€)</option>
                             ))}
                         </select>

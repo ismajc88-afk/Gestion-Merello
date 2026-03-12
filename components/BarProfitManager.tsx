@@ -1,11 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { AppData, Transaction, BarSession } from '../types';
-import { Plus, X, BarChart2 } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import { BarKPISummary } from './bar/BarKPISummary';
 import { BarSessionList } from './bar/BarSessionList';
 import { BarHistorySidebar } from './bar/BarHistorySidebar';
 import { BarGlobalReport } from './bar/BarGlobalReport';
-import { BarProductHistory } from './bar/BarProductHistory';
 
 interface Props {
     data: AppData;
@@ -22,7 +21,6 @@ export const BarProfitManager: React.FC<Props> = ({ data, onUpdateSessions, onAd
     // VIEW MODE
     const [viewMode, setViewMode] = useState<'ACTIVE' | 'HISTORY'>('ACTIVE');
     const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
-    const [mainTab, setMainTab] = useState<'SESSIONS' | 'PRODUCT_HISTORY'>('SESSIONS');
 
     const [sessionName, setSessionName] = useState('');
 
@@ -124,63 +122,37 @@ export const BarProfitManager: React.FC<Props> = ({ data, onUpdateSessions, onAd
                 netProfit={netProfit}
                 totalRevenue={totalRevenue}
                 totalBottleCost={totalBottleCost}
-                stockCount={data.stock.filter(i => i.usageType === 'VENTA').length}
+                stockCount={data.stock.length}
                 onShowGlobalReport={() => setShowGlobalReport(true)}
                 onSetActiveSession={setActiveSessionId}
             />
 
-            {/* TABS */}
-            <div className="flex gap-2 bg-slate-100 p-1 rounded-2xl self-start">
-                <button
-                    onClick={() => setMainTab('SESSIONS')}
-                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${mainTab === 'SESSIONS' ? 'bg-white shadow text-slate-800' : 'text-slate-400 hover:text-slate-600'
-                        }`}
-                >
-                    Sesiones
-                </button>
-                <button
-                    onClick={() => setMainTab('PRODUCT_HISTORY')}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${mainTab === 'PRODUCT_HISTORY' ? 'bg-white shadow text-slate-800' : 'text-slate-400 hover:text-slate-600'
-                        }`}
-                >
-                    <BarChart2 size={13} />
-                    Historial de ventas
-                </button>
-            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
 
-            {mainTab === 'SESSIONS' && (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
-                    <BarSessionList
-                        sessions={sessions}
-                        activeSessionId={activeSessionId}
-                        setActiveSessionId={setActiveSessionId}
-                        viewMode={viewMode}
-                        setViewMode={setViewMode}
-                        setShowNewSession={setShowNewSession}
-                        onUpdateSession={handleUpdateSession}
-                        onCloseSession={() => setActiveSessionId(null)}
-                        onUpdateStock={onUpdateStock}
-                        onAddTransaction={onAddTransaction}
-                        data={data}
-                        selectedHistoryId={selectedHistoryId}
-                        setSelectedHistoryId={setSelectedHistoryId}
-                    />
-                    <BarHistorySidebar
-                        selectedHistoryId={selectedHistoryId}
-                        closedSessions={closedSessions}
-                        data={data}
-                        onClose={() => setSelectedHistoryId(null)}
-                        advancedStats={advancedStats}
-                    />
-                </div>
-            )}
-
-            {mainTab === 'PRODUCT_HISTORY' && (
-                <BarProductHistory
-                    barSessions={data.barSessions || []}
-                    barPrices={data.appConfig.barPrices}
+                <BarSessionList
+                    sessions={sessions}
+                    activeSessionId={activeSessionId}
+                    setActiveSessionId={setActiveSessionId}
+                    viewMode={viewMode}
+                    setViewMode={setViewMode}
+                    setShowNewSession={setShowNewSession}
+                    onUpdateSession={handleUpdateSession}
+                    onCloseSession={() => setActiveSessionId(null)}
+                    onUpdateStock={onUpdateStock}
+                    onAddTransaction={onAddTransaction}
+                    data={data}
+                    selectedHistoryId={selectedHistoryId}
+                    setSelectedHistoryId={setSelectedHistoryId}
                 />
-            )}
+
+                <BarHistorySidebar
+                    selectedHistoryId={selectedHistoryId}
+                    closedSessions={closedSessions}
+                    data={data}
+                    onClose={() => setSelectedHistoryId(null)}
+                    advancedStats={advancedStats}
+                />
+            </div>
 
             <BarGlobalReport
                 isOpen={showGlobalReport}
