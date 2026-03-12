@@ -11,7 +11,7 @@ import {
     Package, Check,
     X, Plus, Minus, Ticket,
     RotateCcw, Zap, ZapOff,
-    Lock, ShieldAlert, History, Banknote
+    ShieldAlert, History
 } from 'lucide-react';
 import { useScreenWakeLock } from '../hooks/useScreenWakeLock';
 
@@ -69,7 +69,6 @@ export const KioskMode: React.FC<KioskModeProps> = ({
     // Stock State (Para Camareros/Casal)
     const [restockItem, setRestockItem] = useState<StockItem | null>(null);
     const [restockQty, setRestockQty] = useState(1);
-    const [restockUrgency, setRestockUrgency] = useState<'NORMAL' | 'URGENT'>('NORMAL');
     const [justification, setJustification] = useState(''); // Para peticiones que excedan cupo
 
     // --- EFECTOS ---
@@ -128,14 +127,9 @@ export const KioskMode: React.FC<KioskModeProps> = ({
         alert("❄️ AVISO DE HIELO ENVIADO");
     };
 
-    const handleChangeRequest = () => {
-        onCreateIncident('💵 CAJA SIN CAMBIO - Se necesita cambio urgente en caja', 'URGENT', undefined, undefined, initialMode);
-        toast.success('✅ Petición de cambio enviada al encargado');
-    };
-
     const confirmRestock = () => {
         if (!restockItem) return;
-        onCreateIncident(`Reposición: ${restockItem.name}`, restockUrgency, restockItem.id, restockQty, initialMode);
+        onCreateIncident(`Reposición: ${restockItem.name}`, 'NORMAL', restockItem.id, restockQty, initialMode);
         setRestockItem(null);
         setJustification('');
     };
@@ -148,7 +142,7 @@ export const KioskMode: React.FC<KioskModeProps> = ({
         // Crear incidencia con flag de autorización requerida
         onCreateIncident(
             `🔓 APROBACIÓN REQUERIDA: ${restockItem.name} (${restockQty} ${restockItem.unit}) - ${justification}`,
-            restockUrgency,
+            'NORMAL',
             restockItem.id,
             restockQty,
             initialMode
@@ -167,21 +161,38 @@ export const KioskMode: React.FC<KioskModeProps> = ({
         return (
             <div className="fixed inset-0 bg-[#0f172a] text-white z-[500] flex flex-col h-[100dvh]">
                 {/* HEADER POS */}
-                <div className="p-3 bg-slate-900 border-b border-white/10 flex justify-between items-center shrink-0 safe-pt">
-                    <div className="flex items-center gap-3">
-                        <button onClick={onExit} className="p-3 bg-white/10 rounded-2xl hover:bg-rose-500/20"><LogOut size={20} /></button>
-                        <h2 className="font-black text-lg uppercase italic tracking-tighter">CAJA / TPV</h2>
-                    </div>
-                    <div className="flex gap-2">
-                        <button onClick={toggleLock} className={`p-3 rounded-xl transition-all ${isLocked ? 'bg-amber-500 text-slate-900 shadow-[0_0_15px_rgba(245,158,11,0.4)]' : 'bg-white/10 text-slate-400'}`}>{isLocked ? <Zap size={20} fill="currentColor" /> : <ZapOff size={20} />}</button>
-                        <button onClick={() => { setCorrectionMode(!correctionMode); setManualCountMode(false); }} className={`p-3 rounded-xl ${correctionMode ? 'bg-rose-500 animate-pulse' : 'bg-white/10'}`}><RotateCcw size={20} /></button>
-                        <button onClick={() => setShowCounter(true)} className="p-3 bg-indigo-600/20 text-indigo-400 rounded-xl"><Ticket size={20} /></button>
-                        <button
-                            onClick={handleChangeRequest}
-                            className="p-3 bg-amber-500/20 text-amber-300 rounded-xl hover:bg-amber-500/40 active:scale-95 transition-all"
-                            title="Pedir cambio"
+                <div className="px-3 py-2 sm:p-4 bg-slate-900/50 backdrop-blur-md border-b-4 border-indigo-500/50 flex justify-between items-center shrink-0 safe-pt relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/5 via-transparent to-rose-500/5"></div>
+                    <div className="flex items-center gap-2 sm:gap-4 relative z-10">
+                        <button 
+                            onClick={onExit} 
+                            className="p-2.5 sm:p-3 bg-rose-500/20 border-2 border-rose-500/50 text-rose-400 rounded-xl sm:rounded-2xl hover:bg-rose-500/40 transition-all active:scale-90"
                         >
-                            <Banknote size={20} />
+                            <LogOut size={20} />
+                        </button>
+                        <div>
+                            <h2 className="font-black text-lg sm:text-2xl uppercase italic tracking-tighter bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">CAJA / TPV</h2>
+                            <p className="text-[9px] sm:text-[10px] font-bold text-indigo-400 uppercase tracking-widest -mt-0.5">Terminal de Venta</p>
+                        </div>
+                    </div>
+                    <div className="flex gap-2 sm:gap-3 relative z-10">
+                        <button 
+                            onClick={toggleLock} 
+                            className={`p-2.5 sm:p-4 rounded-xl sm:rounded-2xl border-2 transition-all duration-300 ${isLocked ? 'bg-amber-500 border-amber-400 text-slate-900' : 'bg-white/5 border-white/10 text-slate-400'}`}
+                        >
+                            {isLocked ? <Zap size={18} fill="currentColor" /> : <ZapOff size={18} />}
+                        </button>
+                        <button 
+                            onClick={() => { setCorrectionMode(!correctionMode); setManualCountMode(false); }} 
+                            className={`p-2.5 sm:p-4 rounded-xl sm:rounded-2xl border-2 transition-all ${correctionMode ? 'bg-rose-600 border-rose-400 text-white animate-pulse' : 'bg-white/5 border-white/10 text-slate-400'}`}
+                        >
+                            <RotateCcw size={18} />
+                        </button>
+                        <button 
+                            onClick={() => setShowCounter(true)} 
+                            className="p-2.5 sm:p-4 bg-indigo-600 border-2 border-indigo-400 text-white rounded-xl sm:rounded-2xl hover:bg-indigo-500 transition-all active:scale-95"
+                        >
+                            <Ticket size={18} />
                         </button>
                     </div>
                 </div>
@@ -193,15 +204,44 @@ export const KioskMode: React.FC<KioskModeProps> = ({
                         {manualCountMode && <div className="bg-orange-500 text-black text-center text-xs font-black py-1">MODO CONTEO (NO COBRA)</div>}
                         {correctionMode && <div className="bg-rose-600 text-white text-center text-xs font-black py-1">MODO CORRECCIÓN (RESTAR)</div>}
 
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 p-4 pb-32 overflow-y-auto">
+                        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-6 pb-32 overflow-y-auto custom-scrollbar">
                             {allItems.map(itemName => {
                                 const price = prices.find(p => p.name.toUpperCase() === itemName.toUpperCase())?.price || 0;
                                 const qtyInCart = cart.find(i => i.name === itemName)?.quantity || 0;
                                 return (
-                                    <button key={itemName} onClick={() => handleProductClick(itemName, price)} className={`relative p-4 rounded-[32px] flex flex-col items-center justify-between text-center h-48 border-2 ${correctionMode ? 'bg-rose-50 border-rose-500' : 'bg-white border-slate-100'}`}>
-                                        {qtyInCart > 0 && <div className="absolute top-3 right-3 bg-indigo-600 text-white w-8 h-8 rounded-xl flex items-center justify-center font-black">{qtyInCart}</div>}
-                                        <span className="text-base font-black uppercase text-slate-900 mt-4 leading-tight">{itemName}</span>
-                                        <span className="text-2xl font-black text-emerald-500 mb-2">{price}€</span>
+                                    <button 
+                                        key={itemName} 
+                                        onClick={() => handleProductClick(itemName, price)} 
+                                        className={`group relative p-6 rounded-[32px] flex flex-col items-center justify-center text-center h-52 border-2 transition-all duration-300 active:scale-95 ${
+                                            correctionMode 
+                                                ? 'bg-rose-950/20 border-rose-500/50 hover:bg-rose-500/20' 
+                                                : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-indigo-500/50'
+                                        }`}
+                                    >
+                                        {/* Background Glow Effect */}
+                                        <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity blur-2xl rounded-[32px] ${
+                                            correctionMode ? 'bg-rose-500/10' : 'bg-indigo-500/10'
+                                        }`}></div>
+
+                                        {qtyInCart > 0 && (
+                                            <div className="absolute -top-2 -right-2 bg-indigo-500 text-white w-10 h-10 rounded-2xl flex items-center justify-center font-black text-xl shadow-lg border-2 border-indigo-400 animate-in zoom-in">
+                                                {qtyInCart}
+                                            </div>
+                                        )}
+                                        
+                                        <div className="relative z-10 flex flex-col items-center gap-2">
+                                            <span className="text-lg font-black uppercase text-white leading-tight drop-shadow-md group-hover:scale-105 transition-transform">
+                                                {itemName}
+                                            </span>
+                                            <div className={`h-1 w-8 rounded-full mb-1 transition-all group-hover:w-12 ${
+                                                correctionMode ? 'bg-rose-500' : 'bg-indigo-500'
+                                            }`}></div>
+                                            <span className={`text-3xl font-black ${
+                                                correctionMode ? 'text-rose-400' : 'text-emerald-400'
+                                            }`}>
+                                                {price}€
+                                            </span>
+                                        </div>
                                     </button>
                                 );
                             })}
@@ -215,29 +255,72 @@ export const KioskMode: React.FC<KioskModeProps> = ({
                     </div>
 
                     {/* SIDEBAR CART */}
-                    <div className={`w-full md:w-96 bg-slate-900 flex-col border-l border-white/10 ${mobileTab === 'PRODUCTS' ? 'hidden md:flex' : 'flex'}`}>
-                        <div className="p-4 border-b border-white/10 flex justify-between items-center bg-slate-800">
-                            <h3 className="font-black uppercase italic">Ticket Actual</h3>
-                            <button onClick={() => setMobileTab('PRODUCTS')} className="md:hidden"><X /></button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                            {cart.map((item, idx) => (
-                                <div key={idx} className="bg-white/5 rounded-xl p-3 flex justify-between items-center">
-                                    <div><p className="font-bold">{item.name}</p><p className="text-xs opacity-60">{item.price}€</p></div>
-                                    <div className="flex items-center gap-3">
-                                        <button onClick={() => updateCartQty(item.name, -1)} className="w-8 h-8 bg-white/10 rounded-lg">-</button>
-                                        <span className="font-black">{item.quantity}</span>
-                                        <button onClick={() => updateCartQty(item.name, 1)} className="w-8 h-8 bg-white/10 rounded-lg">+</button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="p-6 bg-slate-800 border-t border-white/10 safe-pb">
-                            <div className="flex justify-between items-end mb-4">
-                                <span className="text-slate-400 font-bold text-xs uppercase">Total</span>
-                                <span className="text-4xl font-black">{cartTotal.toFixed(2)}€</span>
+                    <div className={`w-full md:w-96 bg-slate-900 flex-col border-l-4 border-indigo-500/50 shadow-[-10px_0_30px_rgba(0,0,0,0.5)] ${mobileTab === 'PRODUCTS' ? 'hidden md:flex' : 'flex'}`}>
+                        <div className="p-6 border-b border-white/10 flex justify-between items-center bg-slate-800/80 backdrop-blur-md">
+                            <div>
+                                <h3 className="font-black text-xl uppercase italic tracking-tighter text-white">Ticket Actual</h3>
+                                <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest -mt-1">{cartCount} Artículos</p>
                             </div>
-                            <button onClick={handleCheckout} disabled={cart.length === 0} className="w-full py-5 bg-emerald-500 text-slate-900 rounded-2xl font-black uppercase text-lg">Cobrar</button>
+                            <button onClick={() => setMobileTab('PRODUCTS')} className="md:hidden p-2 bg-white/5 rounded-xl"><X /></button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-6 space-y-3 custom-scrollbar">
+                            {cart.length === 0 ? (
+                                <div className="h-full flex flex-col items-center justify-center opacity-20">
+                                    <ShoppingCart size={64} className="mb-4" />
+                                    <p className="font-black uppercase text-sm">Ticket Vacío</p>
+                                </div>
+                            ) : (
+                                cart.map((item, idx) => (
+                                    <div key={idx} className="bg-white/5 border border-white/10 rounded-[20px] p-4 flex justify-between items-center group hover:bg-white/10 transition-all">
+                                        <div className="flex-1">
+                                            <p className="font-black text-white uppercase leading-tight">{item.name}</p>
+                                            <p className="text-sm font-bold text-emerald-400 leading-none mt-1">{item.price}€</p>
+                                        </div>
+                                        <div className="flex items-center gap-3 bg-slate-950/50 p-1 rounded-xl border border-white/5">
+                                            <button 
+                                                onClick={() => updateCartQty(item.name, -1)} 
+                                                className="w-10 h-10 bg-white/5 hover:bg-rose-500/20 hover:text-rose-400 text-white rounded-lg transition-all active:scale-90 font-black"
+                                            >
+                                                -
+                                            </button>
+                                            <span className="font-black text-xl w-6 text-center">{item.quantity}</span>
+                                            <button 
+                                                onClick={() => updateCartQty(item.name, 1)} 
+                                                className="w-10 h-10 bg-white/5 hover:bg-indigo-500/20 hover:text-indigo-400 text-white rounded-lg transition-all active:scale-90 font-black"
+                                            >
+                                                +
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+
+                        <div className="p-8 bg-slate-800/80 backdrop-blur-xl border-t-2 border-white/10 safe-pb">
+                            <div className="flex justify-between items-end mb-6">
+                                <div>
+                                    <span className="text-slate-400 font-black text-[10px] uppercase tracking-[0.2em]">Total Bruto</span>
+                                    <div className="h-1 w-12 bg-emerald-500 rounded-full mt-1"></div>
+                                </div>
+                                <span className="text-5xl font-black text-white tracking-tighter tabular-nums">{cartTotal.toFixed(2)}€</span>
+                            </div>
+                            <button 
+                                onClick={handleCheckout} 
+                                disabled={cart.length === 0} 
+                                className={`w-full py-6 rounded-3xl font-black uppercase text-xl tracking-widest transition-all duration-500 relative overflow-hidden group/btn ${
+                                    cart.length === 0 
+                                        ? 'bg-slate-700 text-slate-500 cursor-not-allowed border-2 border-transparent' 
+                                        : 'bg-emerald-500 text-slate-900 border-2 border-emerald-400 shadow-[0_10px_40px_rgba(16,185,129,0.3)] hover:shadow-[0_15px_50px_rgba(16,185,129,0.5)] hover:-translate-y-1 active:scale-95'
+                                }`}
+                            >
+                                <span className="relative z-10 flex items-center justify-center gap-3">
+                                    <Check size={28} strokeWidth={4} /> Cobrar
+                                </span>
+                                {cart.length > 0 && (
+                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-1000"></div>
+                                )}
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -289,39 +372,50 @@ export const KioskMode: React.FC<KioskModeProps> = ({
         return (
             <div className="fixed inset-0 bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950 text-white z-[500] flex flex-col h-[100dvh]">
                 {/* HEADER LOGÍSTICA */}
-                <div className="relative p-4 bg-gradient-to-r from-blue-900/80 via-indigo-800/80 to-blue-900/80 backdrop-blur-xl border-b border-white/10 shrink-0 shadow-2xl">
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <h2 className="text-2xl font-black uppercase tracking-tight bg-gradient-to-r from-white via-blue-200 to-white bg-clip-text text-transparent">
-                                📦 Logística
+                <div className="relative p-6 bg-slate-900/80 backdrop-blur-2xl border-b-4 border-blue-500/50 shrink-0 shadow-2xl relative overflow-hidden">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.1),transparent)]"></div>
+                    <div className="flex justify-between items-center relative z-10">
+                        <div className="flex items-center gap-4">
+                             <h2 className="text-3xl font-black uppercase tracking-tighter bg-gradient-to-r from-white via-blue-200 to-blue-400 bg-clip-text text-transparent">
+                                📦 Centro Logístico
                             </h2>
-                            <p className="text-xs font-bold text-blue-300/70 uppercase tracking-wider mt-0.5">
-                                Gestión de Pedidos
-                            </p>
+                            <span className="px-3 py-1 bg-blue-500/20 border border-blue-500/50 rounded-full text-[10px] font-black text-blue-400 uppercase tracking-widest animate-pulse">
+                                Live Monitor
+                            </span>
                         </div>
-                        <button onClick={toggleLock} className={`mr-2 p-3 rounded-full border-2 transition-all ${isLocked ? 'bg-amber-500 border-amber-500 text-slate-900' : 'bg-blue-500/20 border-blue-500/30 text-blue-300'}`}>{isLocked ? <Zap size={20} fill="currentColor" /> : <ZapOff size={20} />}</button>
-                        <button
-                            onClick={onExit}
-                            className="p-3 bg-red-500/20 hover:bg-red-500/30 rounded-full border-2 border-red-500/30 text-red-400 transition-all active:scale-95"
-                        >
-                            <LogOut size={20} />
-                        </button>
+                        <div className="flex gap-3">
+                            <button onClick={toggleLock} className={`p-4 rounded-2xl border-2 transition-all duration-300 ${isLocked ? 'bg-amber-500 border-amber-400 text-slate-900 shadow-[0_0_20px_rgba(245,158,11,0.3)]' : 'bg-white/5 border-white/10 text-slate-400 hover:border-white/20'}`}>
+                                {isLocked ? <Zap size={20} fill="currentColor" /> : <ZapOff size={20} />}
+                            </button>
+                            <button
+                                onClick={onExit}
+                                className="p-4 bg-rose-500/20 hover:bg-rose-500/40 border-2 border-rose-500/50 rounded-2xl text-rose-400 transition-all active:scale-90"
+                            >
+                                <LogOut size={24} />
+                            </button>
+                        </div>
                     </div>
 
                     {/* CONTADOR DE PENDIENTES */}
-                    <div className="mt-4 grid grid-cols-2 gap-3">
-                        <div className="bg-blue-500/10 rounded-xl p-3 border border-blue-500/20">
-                            <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest">Pendientes</p>
-                            <p className="text-3xl font-black text-white tabular-nums">{pendingRequests.length}</p>
+                    <div className="mt-6 grid grid-cols-2 gap-4">
+                        <div className="bg-blue-500/10 rounded-2xl p-4 border-2 border-blue-500/30 shadow-[0_0_20px_rgba(59,130,246,0.1)] group hover:bg-blue-500/20 transition-all">
+                            <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Peticiones en Espera</p>
+                            <div className="flex items-end gap-2">
+                                <p className="text-5xl font-black text-white tabular-nums drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">{pendingRequests.length}</p>
+                                <span className="mb-2 text-blue-400 font-bold uppercase text-xs">Unidades</span>
+                            </div>
                         </div>
-                        <div className="bg-emerald-500/10 rounded-xl p-3 border border-emerald-500/20">
-                            <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Entregados Hoy</p>
-                            <p className="text-3xl font-black text-white tabular-nums">
-                                {incidents.filter(inc =>
-                                    inc.status === 'RESOLVED' &&
-                                    inc.timestamp.startsWith(new Date().toISOString().split('T')[0])
-                                ).length}
-                            </p>
+                        <div className="bg-emerald-500/10 rounded-2xl p-4 border-2 border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.1)] group hover:bg-emerald-500/20 transition-all">
+                            <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-1">Entregas Completadas</p>
+                            <div className="flex items-end gap-2">
+                                <p className="text-5xl font-black text-white tabular-nums drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">
+                                    {incidents.filter(inc => 
+                                        inc.status === 'RESOLVED' && 
+                                        inc.timestamp.startsWith(new Date().toISOString().split('T')[0])
+                                    ).length}
+                                </p>
+                                <span className="mb-2 text-emerald-400 font-bold uppercase text-xs">Hoy</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -334,7 +428,7 @@ export const KioskMode: React.FC<KioskModeProps> = ({
                             <p className="font-black uppercase text-sm text-slate-400">No hay peticiones pendientes</p>
                         </div>
                     ) : (
-                        <div className="space-y-3">
+                        <div className="space-y-4">
                             {pendingRequests.map(request => {
                                 const stockItem = stock.find(s => s.id === request.stockItemId);
                                 if (!stockItem) return null;
@@ -343,75 +437,70 @@ export const KioskMode: React.FC<KioskModeProps> = ({
                                 const isSpecialAuth = request.title.includes('🔓 APROBACIÓN REQUERIDA');
 
                                 return (
-                                    <div
-                                        key={request.id}
-                                        className={`rounded-2xl p-4 border-2 ${isUrgent
-                                            ? 'bg-red-500/10 border-red-500/30'
-                                            : isSpecialAuth
-                                                ? 'bg-orange-500/10 border-orange-500/30'
-                                                : 'bg-blue-500/10 border-blue-500/20'
-                                            }`}
+                                    <div 
+                                        key={request.id} 
+                                        className={`rounded-[32px] p-6 border-2 transition-all duration-300 relative overflow-hidden group ${
+                                            isUrgent 
+                                                ? 'bg-rose-950/30 border-rose-500 shadow-[0_10px_30px_rgba(225,29,72,0.2)]' 
+                                                : isSpecialAuth 
+                                                    ? 'bg-orange-950/30 border-orange-500 shadow-[0_10px_30px_rgba(249,115,22,0.2)]' 
+                                                    : 'bg-white/5 border-white/10 hover:border-blue-500/50'
+                                        }`}
                                     >
+                                        {/* Status Glow */}
+                                        <div className={`absolute top-0 right-0 w-32 h-32 blur-[60px] opacity-20 -mr-16 -mt-16 transition-opacity group-hover:opacity-40 ${
+                                            isUrgent ? 'bg-rose-500' : isSpecialAuth ? 'bg-orange-500' : 'bg-blue-500'
+                                        }`}></div>
+
                                         {/* Header */}
-                                        <div className="flex justify-between items-start mb-3">
+                                        <div className="flex justify-between items-start mb-4 relative z-10">
                                             <div className="flex-1">
-                                                <div className="flex items-center gap-2 mb-1">
+                                                <div className="flex items-center gap-3 mb-2">
                                                     {isUrgent && (
-                                                        <span className="px-2 py-0.5 bg-red-500 text-white text-[9px] font-black uppercase rounded-full animate-pulse">
-                                                            🚨 Urgente
+                                                        <span className="px-3 py-1 bg-rose-500 text-white text-[10px] font-black uppercase rounded-full animate-pulse shadow-lg shadow-rose-500/50">
+                                                            🚨 Emergencia
                                                         </span>
                                                     )}
                                                     {isSpecialAuth && (
-                                                        <span className="px-2 py-0.5 bg-orange-500 text-white text-[9px] font-black uppercase rounded-full">
+                                                        <span className="px-3 py-1 bg-orange-500 text-white text-[10px] font-black uppercase rounded-full shadow-lg shadow-orange-500/50">
                                                             🔓 Autorización
                                                         </span>
                                                     )}
-                                                    <span className="text-[9px] font-bold text-slate-400 uppercase">
-                                                        {request.terminal || 'N/A'}
+                                                    <span className={`px-2 py-1 bg-slate-800 rounded-lg text-[10px] font-bold uppercase tracking-widest ${
+                                                        request.terminal === 'VENTA' ? 'text-indigo-400' : 'text-rose-400'
+                                                    }`}>
+                                                        {request.terminal || 'General'}
                                                     </span>
                                                 </div>
-                                                <h3 className="font-black text-lg uppercase text-white leading-tight">
+                                                <h3 className="font-black text-2xl uppercase text-white leading-none tracking-tighter mb-1">
                                                     {stockItem.name}
                                                 </h3>
-                                                <p className="text-xs text-slate-400 mt-0.5">
-                                                    {new Date(request.timestamp).toLocaleTimeString('es-ES', {
-                                                        hour: '2-digit',
-                                                        minute: '2-digit'
-                                                    })}
+                                                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                                                    {new Date(request.timestamp).toLocaleTimeString('es-ES', { 
+                                                        hour: '2-digit', 
+                                                        minute: '2-digit' 
+                                                    })} • {stockItem.location}
                                                 </p>
                                             </div>
                                             <div className="text-right">
-                                                <p className="text-3xl font-black text-white tabular-nums">
-                                                    {request.quantity || 1}
-                                                </p>
-                                                <p className="text-xs font-bold text-slate-400 uppercase">
-                                                    {stockItem.unit}
-                                                </p>
+                                                <div className="flex flex-col items-end">
+                                                    <p className="text-5xl font-black text-white tabular-nums leading-none tracking-tighter italic">
+                                                        {request.quantity || 1}
+                                                    </p>
+                                                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest mt-1">
+                                                        {stockItem.unit}
+                                                    </p>
+                                                </div>
                                             </div>
                                         </div>
 
-                                        {/* Info adicional */}
-                                        <div className="grid grid-cols-2 gap-2 mb-3">
-                                            <div className="bg-slate-900/50 rounded-lg p-2">
-                                                <p className="text-[9px] font-bold text-slate-500 uppercase">Stock Actual</p>
-                                                <p className={`text-lg font-black ${stockItem.quantity <= stockItem.minStock ? 'text-amber-400' : 'text-white'
-                                                    }`}>
-                                                    {stockItem.quantity} {stockItem.unit}
-                                                </p>
-                                            </div>
-                                            <div className="bg-slate-900/50 rounded-lg p-2">
-                                                <p className="text-[9px] font-bold text-slate-500 uppercase">Ubicación</p>
-                                                <p className="text-sm font-black text-white truncate">{stockItem.location}</p>
-                                            </div>
-                                        </div>
-
-                                        {/* Botón de confirmar entrega */}
-                                        <button
+                                        {/* Action Button */}
+                                        <button 
                                             onClick={() => handleMarkAsDelivered(request.id)}
-                                            className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black uppercase text-sm flex items-center justify-center gap-2 transition-all active:scale-95"
+                                            className="w-full py-4 mt-2 bg-emerald-500 hover:bg-emerald-400 text-slate-900 rounded-2xl font-black uppercase text-sm flex items-center justify-center gap-3 transition-all active:scale-95 shadow-lg shadow-emerald-500/20"
                                         >
-                                            <Check size={18} />
-                                            Marcar como Entregado
+                                            <Check size={24} strokeWidth={4} />
+                                            Entregar Pedido
                                         </button>
                                     </div>
                                 );
@@ -429,144 +518,126 @@ export const KioskMode: React.FC<KioskModeProps> = ({
     const myRequests = incidents.filter(i => (i.requestedBy === userRole || i.terminal === initialMode) && i.status !== 'RESOLVED' && i.status !== 'ARCHIVED');
     const pendingCount = myRequests.filter(i => i.status === 'DELIVERED').length;
 
-    const itemsToShow = stock.filter(s => s.usageType === initialMode).sort((a, _b) => (a.quantity <= a.minStock ? -1 : 1));
+    const itemsToShow = stock.sort((a, _b) => (a.quantity <= a.minStock ? -1 : 1));
 
     return (
         <div className="fixed inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white z-[500] flex flex-col h-[100dvh]">
             {/* HEADER PREMIUM */}
-            <div className="relative p-4 bg-gradient-to-r from-slate-900/80 via-slate-800/80 to-slate-900/80 backdrop-blur-xl border-b border-white/10 shrink-0 safe-pt shadow-2xl">
-                {/* Efecto de brillo en el header */}
+            <div className="relative px-4 py-3 bg-slate-900/80 backdrop-blur-2xl border-b-4 border-slate-700/50 shrink-0 safe-pt shadow-2xl overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-pulse"></div>
-
-                <div className="relative flex justify-between items-center">
-                    <div className="flex items-center gap-4">
-                        <button onClick={onExit} className="p-3 bg-gradient-to-br from-rose-500 to-rose-600 rounded-2xl hover:from-rose-600 hover:to-rose-700 shadow-lg shadow-rose-500/30 active:scale-95 transition-all">
-                            <LogOut size={22} />
+                {/* Fila 1: título + botones de acción */}
+                <div className="flex justify-between items-center relative z-10">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <button onClick={onExit} className="shrink-0 p-3 bg-rose-500/20 border-2 border-rose-500/50 rounded-xl text-rose-400 hover:bg-rose-500/40 transition-all active:scale-95">
+                            <LogOut size={20} />
                         </button>
-                        <button onClick={toggleLock} className={`p-3 rounded-2xl transition-all ${isLocked ? 'bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/40' : 'bg-slate-800/50 text-slate-400 hover:text-white border border-white/5'}`}>{isLocked ? <Zap size={22} fill="currentColor" /> : <ZapOff size={22} />}</button>
+                        <button onClick={toggleLock} className={`shrink-0 p-3 rounded-xl border-2 transition-all duration-300 ${isLocked ? 'bg-amber-500 border-amber-400 text-slate-900' : 'bg-white/5 border-white/10 text-slate-400'}`}>
+                            {isLocked ? <Zap size={20} fill="currentColor" /> : <ZapOff size={20} />}
+                        </button>
                         <button
                             onClick={() => setShowRequests(!showRequests)}
-                            className={`p-3 rounded-2xl transition-all relative ${showRequests
-                                ? 'bg-indigo-500/30 text-indigo-400 border border-indigo-500/50'
-                                : 'bg-slate-800/50 text-slate-400 hover:text-white border border-white/5'
+                            className={`shrink-0 p-3 rounded-xl border-2 transition-all relative ${showRequests
+                                ? 'bg-indigo-600 border-indigo-400 text-white'
+                                : 'bg-white/5 border-white/10 text-slate-400'
                                 }`}
                         >
-                            <History size={22} />
+                            <History size={20} />
                             {pendingCount > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-slate-900 animate-pulse"></span>}
                         </button>
-                        <div>
-                            <h2 className="font-black text-xl md:text-2xl uppercase italic tracking-tight bg-gradient-to-r from-white via-blue-200 to-white bg-clip-text text-transparent">
+                        {userRole === 'CAJERO' && (
+                            <button onClick={() => setShowCounter(true)} className="shrink-0 p-3 bg-indigo-600 border-2 border-indigo-400 text-white rounded-xl active:scale-95 transition-all">
+                                <Ticket size={20} />
+                            </button>
+                        )}
+                        <div className="ml-1 min-w-0">
+                            <h2 className="text-lg sm:text-2xl font-black uppercase italic tracking-tighter bg-gradient-to-r from-white via-slate-300 to-white bg-clip-text text-transparent truncate">
                                 Almacén {initialMode}
                             </h2>
-                            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2 mt-1">
-                                <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
-                                Toca para solicitar reposición
+                            <p className="text-[9px] font-black text-indigo-400 uppercase tracking-wider flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse shrink-0"></span>
+                                Reposición
                             </p>
                         </div>
                     </div>
 
-                    <div className="flex gap-3 items-center">
-                        {/* BOTÓN DE TICKETS SOLO VISIBLE PARA CAJERO */}
-                        {userRole === 'CAJERO' && (
-                            <button onClick={() => setShowCounter(true)} className="p-3 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl hover:from-indigo-500 hover:to-purple-500 shadow-lg shadow-indigo-500/30 transition-all">
-                                <Ticket size={22} />
+                    {/* Selector Carga - compacto */}
+                    <div className="flex bg-slate-950/50 backdrop-blur-sm rounded-xl p-1 border-2 border-white/10 shadow-inner shrink-0 ml-2">
+                        {(['BAJA', 'NORMAL', 'ALTA'] as KioskWorkload[]).map(w => (
+                            <button
+                                key={w}
+                                onClick={() => setWorkload(w)}
+                                className={`px-2 sm:px-4 py-2 rounded-lg text-[10px] sm:text-xs font-black uppercase transition-all duration-300 ${workload === w
+                                    ? 'bg-indigo-600 text-white shadow-lg border border-indigo-400'
+                                    : 'text-slate-500 hover:text-slate-300'
+                                    }`}
+                            >
+                                {w}
                             </button>
-                        )}
-
-                        {/* Selector de carga de trabajo mejorado */}
-                        <div className="flex bg-slate-950/50 backdrop-blur-sm rounded-2xl p-1.5 border border-white/10 shadow-lg">
-                            {(['BAJA', 'NORMAL', 'ALTA'] as KioskWorkload[]).map(w => (
-                                <button
-                                    key={w}
-                                    onClick={() => setWorkload(w)}
-                                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase transition-all ${workload === w
-                                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg'
-                                        : 'text-slate-500 hover:text-slate-300'
-                                        }`}
-                                >
-                                    {w}
-                                </button>
-                            ))}
-                        </div>
+                        ))}
                     </div>
                 </div>
             </div>
 
             {/* GRID STOCK PREMIUM */}
-            <div className="flex-1 overflow-y-auto p-6 pb-32">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
+            <div className="flex-1 overflow-y-auto p-3 sm:p-6 pb-36 custom-scrollbar relative z-10">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-6">
                     {itemsToShow.map(item => {
                         const isLow = item.quantity <= item.minStock;
-                        const limit = item.dailyLimit || 0;
+                        const limit = initialMode === 'CASAL' ? (item.dailyLimit || 0) : 0;
                         const todayUsage = limit > 0 ? getTodayUsage(item.id) : 0;
                         const remaining = Math.max(0, limit - todayUsage);
-
-                        // Gradientes únicos según el estado
-                        const cardGradient = isLow
-                            ? 'from-amber-500/20 via-orange-500/20 to-red-500/20'
-                            : 'from-slate-800/50 via-slate-700/50 to-slate-800/50';
-
-                        const borderColor = isLow
-                            ? 'border-amber-500/40'
-                            : 'border-slate-600/30 hover:border-blue-500/50';
 
                         return (
                             <button
                                 key={item.id}
                                 onClick={() => { setRestockItem(item); setRestockQty(1); }}
-                                className={`group relative p-5 rounded-[24px] bg-gradient-to-br ${cardGradient} backdrop-blur-md border-2 ${borderColor}
-                                      flex flex-col min-h-[240px] cursor-pointer transition-all duration-300
-                                      hover:scale-105 hover:shadow-2xl ${isLow ? 'hover:shadow-amber-500/30' : 'hover:shadow-blue-500/20'}
-                                      active:scale-95 overflow-hidden`}
+                                className={`group relative p-4 sm:p-6 rounded-[24px] sm:rounded-[32px] border-4 transition-all duration-300 active:scale-95 flex flex-col min-h-[180px] sm:min-h-[260px] overflow-hidden ${
+                                    isLow 
+                                        ? 'bg-rose-950/20 border-rose-500 shadow-[0_10px_0_0_rgba(225,29,72,0.4)] hover:translate-y-[-4px] hover:shadow-[0_14px_0_0_rgba(225,29,72,0.4)]' 
+                                        : 'bg-white/5 border-white/10 hover:border-indigo-500 hover:translate-y-[-4px] hover:shadow-[0_10px_0_0_rgba(79,70,229,0.4)]'
+                                }`}
                             >
-                                {/* Efecto de brillo al hover */}
-                                <div className="absolute inset-0 bg-gradient-to-br from-white/0 via-white/5 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity rounded-[24px]"></div>
+                                {/* Status Glow */}
+                                <div className={`absolute top-0 right-0 w-24 h-24 blur-[40px] opacity-10 transition-opacity group-hover:opacity-30 ${
+                                    isLow ? 'bg-rose-500' : 'bg-indigo-500'
+                                }`}></div>
 
-                                {/* Partículas decorativas */}
-                                <div className="absolute top-3 right-3 w-20 h-20 bg-gradient-to-br from-white/5 to-transparent rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
-
-                                {/* Header con icono y badge */}
-                                <div className="relative z-10 flex justify-between items-start mb-3">
-                                    <div className={`p-2.5 rounded-xl backdrop-blur-sm shadow-lg ${isLow
-                                        ? 'bg-amber-500/20 text-amber-300 shadow-amber-500/20'
-                                        : 'bg-blue-500/20 text-blue-300 shadow-blue-500/20'
-                                        }`}>
-                                        {item.category.includes('BEBIDA') ? <Wine size={20} /> : <Package size={20} />}
+                                <div className="relative z-10 flex justify-between items-start mb-4">
+                                    <div className={`p-3 rounded-2xl border-2 ${
+                                        isLow ? 'bg-rose-500/20 border-rose-400 text-rose-400' : 'bg-indigo-500/20 border-indigo-400 text-indigo-400'
+                                    }`}>
+                                        {item.category.includes('BEBIDA') ? <Wine size={24} /> : <Package size={24} />}
                                     </div>
                                     {isLow && (
-                                        <div className="flex items-center gap-1 bg-amber-500/90 text-amber-950 px-2.5 py-1 rounded-full shadow-lg animate-pulse">
-                                            <AlertTriangle size={12} />
-                                            <span className="text-[10px] font-black uppercase">Bajo</span>
+                                        <div className="bg-rose-500 text-white px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest animate-pulse shadow-lg shadow-rose-500/40">
+                                            Bajo
                                         </div>
                                     )}
                                 </div>
 
-                                {/* Nombre del producto */}
-                                <h4 className="relative z-10 font-black text-base uppercase text-white leading-tight mb-4 line-clamp-2 drop-shadow-lg min-h-[2.5rem]">
+                                <h4 className="relative z-10 font-black text-xl uppercase text-white leading-none tracking-tighter mb-4 line-clamp-2 drop-shadow-md text-left">
                                     {item.name}
                                 </h4>
 
-                                {/* Información inferior */}
-                                <div className="relative z-10 mt-auto space-y-2.5">
+                                <div className="relative z-10 mt-auto space-y-3">
                                     {limit > 0 ? (
-                                        <div className="bg-slate-950/50 backdrop-blur-sm rounded-xl p-2.5 border border-white/10">
-                                            <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Cupo Diario</p>
-                                            <div className="flex items-baseline gap-1.5">
-                                                <span className="text-2xl font-black text-white drop-shadow-lg">{remaining}</span>
-                                                <span className="text-xs text-slate-500">/ {limit}</span>
+                                        <div className="bg-slate-950/50 rounded-2xl p-3 border border-white/5">
+                                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Cupo Hoy</p>
+                                            <div className="flex items-baseline gap-1">
+                                                <span className={`text-2xl font-black ${remaining === 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{remaining}</span>
+                                                <span className="text-xs font-bold text-slate-600">/ {limit}</span>
                                             </div>
                                         </div>
                                     ) : (
-                                        <div className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-emerald-500/20 to-green-500/20 px-2.5 py-2 rounded-xl border border-emerald-500/30">
+                                        <div className="flex items-center gap-2 px-3 py-2 bg-emerald-500/10 rounded-xl border border-emerald-500/30">
                                             <Zap size={14} className="text-emerald-400" />
-                                            <span className="text-[10px] font-black uppercase text-emerald-300">Barra Libre</span>
+                                            <span className="text-[10px] font-black uppercase text-emerald-400 tracking-widest">Sin Límite</span>
                                         </div>
                                     )}
 
-                                    <div className="flex justify-between items-center bg-slate-950/50 backdrop-blur-sm rounded-xl p-2.5 border border-white/10">
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase">Stock</span>
-                                        <span className={`text-xl font-black drop-shadow-lg ${isLow ? 'text-amber-400' : 'text-white'
-                                            }`}>
+                                    <div className="flex justify-between items-center bg-slate-950/40 rounded-2xl p-3 border border-white/5">
+                                        <span className="text-[10px] font-black text-slate-500 uppercase">Stock</span>
+                                        <span className={`text-2xl font-black tabular-nums ${isLow ? 'text-rose-400' : 'text-white'}`}>
                                             {item.quantity}
                                         </span>
                                     </div>
@@ -578,22 +649,20 @@ export const KioskMode: React.FC<KioskModeProps> = ({
             </div>
 
             {/* BOTTOM BAR PREMIUM */}
-            <div className="absolute bottom-0 left-0 right-0 p-6 bg-slate-950/95 backdrop-blur-2xl border-t border-white/10 z-40 shadow-2xl safe-pb">
+            <div className="absolute bottom-0 left-0 right-0 px-4 pt-3 pb-4 bg-slate-950/90 backdrop-blur-3xl border-t-2 border-white/10 z-40 shadow-2xl safe-pb">
                 <button
                     onClick={handleIceRequest}
-                    className="w-full py-5 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-[24px] text-white flex items-center justify-center gap-3 
-                          shadow-[0_8px_30px_rgba(6,182,212,0.4)] hover:shadow-[0_8px_40px_rgba(6,182,212,0.6)]
-                          active:scale-98 transition-all group relative overflow-hidden"
+                    className="w-full py-5 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-[28px] border-2 border-cyan-400 text-white flex items-center justify-center gap-3 
+                          shadow-[0_15px_40px_rgba(6,182,212,0.3)] hover:shadow-[0_20px_50px_rgba(6,182,212,0.5)]
+                          active:scale-95 transition-all group relative overflow-hidden"
                 >
-                    {/* Efecto de brillo animado */}
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-
-                    <Snowflake size={28} className="animate-spin-slow relative z-10" />
-                    <span className="font-black text-lg uppercase tracking-wider relative z-10">Pedir Hielo Urgente</span>
+                    <Snowflake size={26} className="animate-spin-slow relative z-10 drop-shadow-lg" />
+                    <span className="font-black text-base sm:text-2xl uppercase tracking-tighter relative z-10 italic">Solicitar Hielo Urgente</span>
                 </button>
             </div>
 
-            {/* MODAL REPOSICION */}
+            {/* MODAL REPOSICION PREMIUM */}
             {restockItem && (() => {
                 const limit = restockItem.dailyLimit || 0;
                 const todayUsage = limit > 0 ? getTodayUsage(restockItem.id) : 0;
@@ -601,201 +670,176 @@ export const KioskMode: React.FC<KioskModeProps> = ({
                 const isOverQuota = limit > 0 && restockQty > remaining;
 
                 return (
-                    <div className="fixed inset-0 z-[600] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-                        <div className="bg-slate-900 border-2 border-slate-700 w-full max-w-sm rounded-[32px] p-6">
-                            <div className="flex justify-between items-start mb-6">
-                                <div><p className="text-[10px] font-black text-indigo-400 uppercase">Solicitar a Logística</p><h3 className="text-2xl font-black text-white uppercase">{restockItem.name}</h3></div>
-                                <button onClick={() => setRestockItem(null)} className="p-2 bg-slate-800 rounded-full text-slate-400"><X /></button>
+                    <div className="fixed inset-0 z-[600] bg-slate-950/90 backdrop-blur-2xl flex items-center justify-center p-4 animate-in fade-in duration-300">
+                        <div className="bg-slate-900 border-4 border-indigo-500/50 w-full max-w-sm rounded-[40px] p-8 shadow-[0_0_50px_rgba(79,70,229,0.3)] relative overflow-hidden">
+                            {/* Accent Glow */}
+                            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 animate-pulse"></div>
+                            
+                            <div className="flex justify-between items-start mb-8">
+                                <div>
+                                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-1">Solicitud de Material</p>
+                                    <h3 className="text-3xl font-black text-white uppercase italic tracking-tighter leading-none">{restockItem.name}</h3>
+                                </div>
+                                <button onClick={() => setRestockItem(null)} className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl text-slate-400 transition-colors">
+                                    <X size={24} />
+                                </button>
                             </div>
 
                             {/* INFORMACIÓN DEL PRODUCTO */}
-                            <div className="grid grid-cols-2 gap-3 mb-6">
-                                {/* Stock Actual */}
-                                <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-3 border border-slate-700">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Stock Actual</p>
+                            <div className="grid grid-cols-2 gap-4 mb-8">
+                                <div className="bg-white/5 rounded-3xl p-4 border-2 border-white/5">
+                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Estado Stock</p>
                                     <div className="flex items-baseline gap-1">
-                                        <span className={`text-2xl font-black ${restockItem.quantity <= restockItem.minStock ? 'text-amber-400' : 'text-white'}`}>
+                                        <span className={`text-3xl font-black ${restockItem.quantity <= restockItem.minStock ? 'text-rose-400' : 'text-white'}`}>
                                             {restockItem.quantity}
                                         </span>
-                                        <span className="text-xs text-slate-500">{restockItem.unit}</span>
+                                        <span className="text-xs font-bold text-slate-600 uppercase">{restockItem.unit}</span>
                                     </div>
                                 </div>
 
-                                {/* Cupo Diario o Barra Libre */}
                                 {limit > 0 ? (
-                                    <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-3 border border-slate-700">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Cupo Hoy</p>
+                                    <div className="bg-white/5 rounded-3xl p-4 border-2 border-white/5">
+                                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Cupo Restante</p>
                                         <div className="flex items-baseline gap-1">
-                                            <span className="text-2xl font-black text-emerald-400">
+                                            <span className={`text-3xl font-black ${remaining === 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
                                                 {remaining}
                                             </span>
-                                            <span className="text-xs text-slate-500">/ {limit}</span>
+                                            <span className="text-xs font-bold text-slate-600">/ {limit}</span>
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="bg-gradient-to-br from-emerald-900/30 to-green-900/30 backdrop-blur-sm rounded-xl p-3 border border-emerald-700/50 flex flex-col items-center justify-center">
-                                        <Zap size={16} className="text-emerald-400 mb-1" />
-                                        <span className="text-[10px] font-black uppercase text-emerald-300">Barra Libre</span>
+                                    <div className="bg-emerald-500/10 rounded-3xl p-4 border-2 border-emerald-500/20 flex flex-col items-center justify-center">
+                                        <Zap size={20} className="text-emerald-400 mb-1" />
+                                        <span className="text-[10px] font-black uppercase text-emerald-400">Sin Límite</span>
                                     </div>
                                 )}
                             </div>
 
                             {/* BLOQUEO SI EXCEDE CUPO */}
                             {isOverQuota && (
-                                <div className="mb-4 bg-rose-500/10 border-2 border-rose-500/40 rounded-xl p-4 animate-pulse">
-                                    <div className="flex items-start gap-2 mb-2">
-                                        <Lock size={18} className="text-rose-400 shrink-0 mt-0.5" />
+                                <div className="mb-6 bg-rose-500/10 border-4 border-rose-500/30 rounded-3xl p-5 shadow-[0_10px_30px_rgba(225,29,72,0.2)]">
+                                    <div className="flex items-start gap-3">
+                                        <div className="bg-rose-500 rounded-xl p-2 text-white shadow-lg shadow-rose-500/40">
+                                            <AlertTriangle size={20} />
+                                        </div>
                                         <div>
-                                            <p className="text-sm font-black text-rose-400 uppercase">Cupo Diario Excedido</p>
-                                            <p className="text-[10px] text-rose-300/80 leading-tight mt-1">
-                                                Solo puedes pedir hasta <span className="font-black">{remaining} {restockItem.unit}</span> con el cupo restante de hoy.
+                                            <p className="text-sm font-black text-rose-400 uppercase leading-none mb-1">Exceso de Cupo</p>
+                                            <p className="text-[10px] text-rose-300 font-bold leading-tight">
+                                                Requiere justificación especial para superar el límite de <span className="text-white">{limit} {restockItem.unit}</span>.
                                             </p>
                                         </div>
-                                    </div>
-                                    <div className="mt-3 pt-3 border-t border-rose-500/20">
-                                        <p className="text-[9px] text-rose-200/60 leading-tight flex items-start gap-1.5">
-                                            <ShieldAlert size={12} className="shrink-0 mt-0.5" />
-                                            <span>Para solicitar más cantidad, contacta con el <span className="font-black">Presidente</span> o <span className="font-black">Administrador</span> para ampliar el cupo.</span>
-                                        </p>
                                     </div>
                                 </div>
                             )}
 
                             {/* SELECTOR DE CANTIDAD */}
-                            <div className={`bg-slate-800/50 p-4 rounded-2xl mb-6 text-center border-2 transition-all ${isOverQuota ? 'border-rose-500/50 opacity-60' : 'border-transparent'
-                                }`}>
-                                <div className="flex items-center justify-center gap-6">
+                            <div className={`bg-slate-950/50 p-6 rounded-[32px] mb-8 border-4 transition-all duration-300 ${
+                                isOverQuota ? 'border-rose-500/40' : 'border-indigo-500/20'
+                            }`}>
+                                <div className="flex items-center justify-between">
                                     <button
                                         onClick={() => setRestockQty(Math.max(1, restockQty - 1))}
-                                        className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center text-white disabled:opacity-40"
+                                        className="w-14 h-14 bg-slate-800 hover:bg-slate-700 rounded-2xl flex items-center justify-center text-white transition-all active:scale-90"
                                     >
-                                        <Minus />
+                                        <Minus size={24} strokeWidth={3} />
                                     </button>
-                                    <span className={`text-4xl font-black transition-colors ${isOverQuota ? 'text-rose-400' : 'text-white'
-                                        }`}>{restockQty}</span>
+                                    <div className="text-center">
+                                        <span className={`text-5xl font-black italic tracking-tighter ${isOverQuota ? 'text-rose-400' : 'text-white'}`}>
+                                            {restockQty}
+                                        </span>
+                                        <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest mt-1">{restockItem.unit}</p>
+                                    </div>
                                     <button
                                         onClick={() => setRestockQty(restockQty + 1)}
-                                        className={`w-12 h-12 rounded-xl flex items-center justify-center text-white ${isOverQuota ? 'bg-rose-600' : 'bg-indigo-600'
-                                            }`}
+                                        className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white transition-all active:scale-90 shadow-lg ${
+                                            isOverQuota ? 'bg-rose-600 shadow-rose-500/20' : 'bg-indigo-600 shadow-indigo-500/20'
+                                        }`}
                                     >
-                                        <Plus />
+                                        <Plus size={24} strokeWidth={3} />
                                     </button>
                                 </div>
-                                <p className="text-xs font-bold text-slate-500 mt-2 uppercase">{restockItem.unit} a pedir</p>
-                                {isOverQuota && (
-                                    <p className="text-[9px] font-black text-rose-400 mt-2 uppercase">Excede límite diario</p>
-                                )}
                             </div>
 
-                            {/* URGENCIA */}
-                            <div className="flex gap-2 mb-6">
-                                <button
-                                    onClick={() => setRestockUrgency('NORMAL')}
-                                    disabled={isOverQuota}
-                                    className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase border-2 transition-opacity ${restockUrgency === 'NORMAL' ? 'bg-slate-700 border-slate-500' : 'border-transparent text-slate-500'
-                                        } ${isOverQuota ? 'opacity-40 cursor-not-allowed' : ''}`}
-                                >
-                                    Normal
-                                </button>
-                                <button
-                                    onClick={() => setRestockUrgency('URGENT')}
-                                    disabled={isOverQuota}
-                                    className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase border-2 transition-opacity ${restockUrgency === 'URGENT' ? 'bg-rose-900/50 border-rose-500 text-rose-400' : 'border-transparent text-slate-500'
-                                        } ${isOverQuota ? 'opacity-40 cursor-not-allowed' : ''}`}
-                                >
-                                    Urgente
-                                </button>
-                            </div>
-
-                            {/* CAMPO DE JUSTIFICACIÓN SI EXCEDE CUPO */}
+                            {/* JUSTIFICACIÓN */}
                             {isOverQuota && (
-                                <div className="mb-4 bg-slate-800/50 rounded-xl p-4 border-2 border-indigo-500/30">
-                                    <label className="text-xs font-black text-indigo-400 uppercase mb-2 block flex items-center gap-2">
-                                        <ShieldAlert size={14} />
-                                        Justificación para Autorización Especial
-                                    </label>
-                                    <textarea
+                                <div className="mb-8 animate-in slide-in-from-bottom-4">
+                                     <textarea
                                         value={justification}
                                         onChange={(e) => setJustification(e.target.value)}
-                                        placeholder="Explica por qué necesitas esta cantidad (ej: evento especial, fin de semana, reposición para varios días...)"
-                                        className="w-full p-3 bg-slate-900 border border-slate-600 rounded-lg text-white text-sm outline-none focus:border-indigo-500 resize-none"
+                                        placeholder="¿Por qué necesitas más cantidad?"
+                                        className="w-full p-5 bg-slate-950 border-4 border-white/5 rounded-[24px] text-white text-sm outline-none focus:border-indigo-500 transition-all font-bold placeholder:text-slate-700 resize-none"
                                         rows={3}
                                     />
-                                    <p className="text-[9px] text-slate-500 mt-2">
-                                        Esta solicitud será enviada al Presidente o Administrador para su aprobación.
-                                    </p>
+                                    <p className="text-[9px] font-bold text-indigo-400/60 mt-2 uppercase text-center">Será revisado por un administrador</p>
                                 </div>
                             )}
 
-                            {/* BOTONES DE CONFIRMACIÓN */}
-                            {isOverQuota ? (
-                                <button
-                                    onClick={requestSpecialAuthorization}
-                                    className={`w-full py-5 rounded-2xl font-black uppercase text-sm flex items-center justify-center gap-2 transition-all ${justification.trim()
-                                        ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-                                        : 'bg-slate-700 text-slate-500 cursor-not-allowed opacity-50'
-                                        }`}
-                                    disabled={!justification.trim()}
-                                >
-                                    <ShieldAlert size={20} />
-                                    Solicitar Autorización Especial
-                                </button>
-                            ) : (
-                                <button
-                                    onClick={confirmRestock}
-                                    className="w-full py-5 rounded-2xl font-black uppercase text-sm flex items-center justify-center gap-2 bg-white text-slate-900 hover:bg-slate-100 transition-all"
-                                >
-                                    <Check size={20} />
-                                    Confirmar Pedido
-                                </button>
-                            )}
+                            {/* BOTÓN FINAL */}
+                            <button
+                                onClick={isOverQuota ? requestSpecialAuthorization : confirmRestock}
+                                disabled={isOverQuota && !justification.trim()}
+                                className={`w-full py-6 rounded-[24px] font-black uppercase text-base flex items-center justify-center gap-3 transition-all active:scale-95 shadow-2xl ${
+                                    isOverQuota 
+                                        ? (justification.trim() ? 'bg-rose-500 text-white shadow-rose-500/30' : 'bg-slate-800 text-slate-600 cursor-not-allowed')
+                                        : 'bg-indigo-600 text-white shadow-indigo-500/30'
+                                }`}
+                            >
+                                {isOverQuota ? <ShieldAlert size={24} /> : <Check size={24} strokeWidth={4} />}
+                                {isOverQuota ? 'Solicitar Autorización' : 'Confirmar Pedido'}
+                            </button>
                         </div>
                     </div>
                 );
             })()}
 
-            {/* MODAL CONTADORES (STOCK MODE) */}
+            {/* MODAL CONTADORES (STOCK MODE) PREMIUM */}
             {showCounter && (
-                <div className="fixed inset-0 z-[600] bg-black/90 flex items-center justify-center p-4">
-                    <div className="bg-slate-900 w-full max-w-md rounded-[32px] p-6 border border-indigo-500/50">
-                        <div className="flex justify-between mb-4">
+                <div className="fixed inset-0 z-[600] bg-slate-950/90 backdrop-blur-2xl flex items-center justify-center p-4">
+                    <div className="bg-slate-900 w-full max-w-sm rounded-[40px] p-8 border-4 border-indigo-500/50 shadow-2xl relative overflow-hidden">
+                        <div className="flex justify-between items-start mb-8">
                             <div>
-                                <h3 className="text-xl font-black text-white">Tickets Vendidos</h3>
-                                <p className="text-[10px] text-slate-400 uppercase tracking-widest">Cola de preparación</p>
+                                <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter">Tickets Vendidos</h3>
+                                <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest mt-1">Live Preparation Queue</p>
                             </div>
-                            <button onClick={() => setShowCounter(false)}><X /></button>
+                            <button onClick={() => setShowCounter(false)} className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl text-slate-400 transition-colors">
+                                <X size={24} />
+                            </button>
                         </div>
 
-                        <div className="max-h-[60vh] overflow-y-auto space-y-2 pr-2">
+                        <div className="max-h-[60vh] overflow-y-auto space-y-3 pr-2 custom-scrollbar">
                             {Object.entries(ticketCounts).length > 0 ? Object.entries(ticketCounts).sort((a, b) => (b[1] as number) - (a[1] as number)).map(([name, count]) => (
-                                <div key={name} className="flex justify-between items-center p-4 bg-white/5 rounded-2xl border border-white/5">
-                                    <span className="font-bold text-white uppercase text-sm">{name}</span>
-                                    <span className="text-2xl font-black text-emerald-400 tabular-nums">{count}</span>
+                                <div key={name} className="flex justify-between items-center p-5 bg-white/5 rounded-3xl border-2 border-white/5 group hover:border-indigo-500/30 transition-all">
+                                    <span className="font-black text-white uppercase text-sm tracking-tight">{name}</span>
+                                    <div className="bg-indigo-500/10 px-4 py-2 rounded-2xl border border-indigo-500/30">
+                                        <span className="text-3xl font-black text-indigo-400 tabular-nums">{count}</span>
+                                    </div>
                                 </div>
                             )) : (
-                                <div className="py-10 text-center text-slate-500 font-bold uppercase text-xs">Sin ventas registradas hoy</div>
+                                <div className="py-12 text-center text-slate-600 font-black uppercase text-xs tracking-widest opacity-50">Sin ventas hoy</div>
                             )}
                         </div>
                     </div>
                 </div>
             )}
-            {/* MODAL MIS PETICIONES */}
+            {/* MODAL MIS PETICIONES PREMIUM */}
             {showRequests && (
-                <div className="fixed inset-0 z-[600] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-                    <div className="bg-slate-900 border-2 border-slate-700 w-full max-w-md rounded-[32px] p-6 max-h-[80vh] flex flex-col">
-                        <div className="flex justify-between items-center mb-6 shrink-0">
+                <div className="fixed inset-0 z-[600] bg-slate-950/90 backdrop-blur-2xl flex items-center justify-center p-4 animate-in fade-in duration-300">
+                    <div className="bg-slate-900 border-4 border-indigo-500/50 w-full max-w-md rounded-[40px] p-8 max-h-[85vh] flex flex-col shadow-2xl relative overflow-hidden">
+                        <div className="flex justify-between items-center mb-8 shrink-0">
                             <div>
-                                <h3 className="text-xl font-black text-white uppercase">Mis Peticiones</h3>
-                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Historial de solicitudes</p>
+                                <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter">Historial Live</h3>
+                                <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest">Seguimiento de Reposición</p>
                             </div>
-                            <button onClick={() => setShowRequests(false)} className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white"><X /></button>
+                            <button onClick={() => setShowRequests(false)} className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl text-slate-400 transition-colors"><X size={24} /></button>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+                        <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
                             {myRequests.length === 0 ? (
-                                <div className="py-10 text-center text-slate-500 font-bold uppercase text-xs opacity-50 flex flex-col items-center gap-3">
-                                    <History size={48} />
-                                    No tienes peticiones activas
+                                <div className="py-20 text-center text-slate-600 font-black uppercase text-xs tracking-widest opacity-50 flex flex-col items-center gap-6">
+                                    <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center">
+                                        <History size={40} className="text-slate-600" />
+                                    </div>
+                                    Bandeja de Entrada Vacía
                                 </div>
                             ) : (
                                 myRequests.map(req => {
@@ -806,37 +850,39 @@ export const KioskMode: React.FC<KioskModeProps> = ({
                                     const isPendingApproval = req.status === 'PENDING_APPROVAL';
 
                                     return (
-                                        <div key={req.id} className={`p-4 rounded-2xl border ${isDelivered
-                                            ? 'bg-emerald-500/10 border-emerald-500/30'
-                                            : isPendingApproval
-                                                ? 'bg-orange-500/10 border-orange-500/30'
-                                                : 'bg-slate-800/50 border-slate-700/50'
+                                        <div key={req.id} className={`p-6 rounded-[32px] border-2 transition-all relative overflow-hidden ${
+                                            isDelivered
+                                                ? 'bg-emerald-500/10 border-emerald-500/40'
+                                                : isPendingApproval
+                                                    ? 'bg-orange-500/10 border-orange-500/40 animate-pulse'
+                                                    : 'bg-white/5 border-white/10'
                                             }`}>
-                                            <div className="flex justify-between items-start mb-2">
-                                                <h4 className="font-black text-white uppercase">{stockItem.name}</h4>
-                                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${isDelivered ? 'bg-emerald-500 text-slate-900' :
-                                                    isPendingApproval ? 'bg-orange-500 text-slate-900 animate-pulse' :
-                                                        'bg-blue-500 text-white'
-                                                    }`}>
-                                                    {isDelivered ? 'Listo' : isPendingApproval ? 'Esperando Aprobación' : 'En Proceso'}
+                                            <div className="flex justify-between items-start mb-4">
+                                                <h4 className="font-black text-xl text-white uppercase tracking-tighter italic">{stockItem.name}</h4>
+                                                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg ${
+                                                    isDelivered ? 'bg-emerald-500 text-slate-900 shadow-emerald-500/20' :
+                                                    isPendingApproval ? 'bg-orange-500 text-slate-900 shadow-orange-500/20' :
+                                                    'bg-indigo-500 text-white shadow-indigo-500/20'
+                                                }`}>
+                                                    {isDelivered ? 'Listos' : isPendingApproval ? 'Bajo Revisión' : 'En Cola'}
                                                 </span>
                                             </div>
                                             <div className="flex justify-between items-end">
-                                                <div className="text-xs text-slate-400">
-                                                    <p>Cantidad: <span className="text-white font-bold">{req.quantity} {stockItem.unit}</span></p>
-                                                    <p>{req.justification ? 'Autorización Especial' : 'Reposición Normal'}</p>
+                                                <div className="space-y-1">
+                                                    <p className="text-3xl font-black text-white tabular-nums leading-none italic">{req.quantity} <span className="text-[10px] not-italic text-slate-500 uppercase">{stockItem.unit}</span></p>
+                                                    <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{req.justification ? '⚡ Autorización Especial' : '📦 Reposición Estándar'}</p>
                                                 </div>
                                                 {isDelivered && (
                                                     <button
                                                         onClick={() => {
-                                                            if (confirm('¿Confirmas que has recibido este pedido? Se descontará del stock.')) {
+                                                            if (window.confirm('¿Confirmas que has recibido este pedido?')) {
                                                                 onConfirmReceipt?.(req.id);
                                                             }
                                                         }}
-                                                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase shadow-lg shadow-emerald-500/20 active:scale-95 transition-all flex items-center gap-2"
+                                                        className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-900 rounded-2xl text-xs font-black uppercase shadow-lg shadow-emerald-500/20 active:scale-95 transition-all flex items-center gap-2"
                                                     >
-                                                        <Check size={14} />
-                                                        Confirmar
+                                                        <Check size={18} strokeWidth={3} />
+                                                        Recibido
                                                     </button>
                                                 )}
                                             </div>

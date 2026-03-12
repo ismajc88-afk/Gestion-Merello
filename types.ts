@@ -1,18 +1,4 @@
 
-export interface RouteStop {
-  id: string;
-  name: string;
-  address: string;
-  lat?: number;
-  lng?: number;
-  timeExp?: string;
-  durationMins?: number;
-  status?: 'PENDING' | 'ARRIVED' | 'COMPLETED';
-  actualArrivalTime?: string;
-  actualDepartureTime?: string;
-  role: 'FMI' | 'PI' | 'FM' | 'P' | 'BANDA' | 'CASAL' | 'OTHER';
-}
-
 export enum TransactionType {
   INCOME = 'INCOME',
   EXPENSE = 'EXPENSE'
@@ -135,7 +121,6 @@ export interface StockItem {
   costPerUnit: number;
   expirationDate?: string;
   supplier?: string;
-  usageType: 'CASAL' | 'VENTA';
   dailyLimit?: number;
   imageUrl?: string;
 }
